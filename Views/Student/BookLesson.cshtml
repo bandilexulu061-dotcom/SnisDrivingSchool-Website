@@ -1,0 +1,271 @@
+﻿@model SnisDrivingSchool.Models.BookLessonViewModel
+@{
+    Layout = "~/Views/Student/_StudentLayout.cshtml";
+    ViewBag.Title = "Book a Lesson";
+    ViewBag.Active = "Book";
+    var earliest = SnisDrivingSchool.Cancellation.EarliestBookingDate;
+    bool canBook = ViewBag.CanBook == true;
+}
+
+<style>
+    .bl-layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 18px; align-items: start; }
+    .bl-step { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; padding: 16px 0; border-top: 1px solid #22325a; }
+    .bl-step:first-of-type { border-top: 0; padding-top: 4px; }
+    .bl-cols { display: grid; grid-template-columns: minmax(0, 1fr) 316px; column-gap: 24px; }
+    .bl-cols .bl-step:first-child { border-top: 1px solid #22325a; padding-top: 16px; }
+    .bl-right .bl-step { border-top: 1px solid #22325a; padding-top: 16px; }
+    .bl-cols .st-input { max-width: none; }
+    .bl-num { width: 30px; height: 30px; border-radius: 50%; background: #1b2a4e; color: #9cc9ff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    .bl-step.done .bl-num { background: var(--accent-blue); color: #fff; }
+    .bl-step h4 { margin: 4px 0 8px; font-size: 15px; color: var(--text-light); }
+    .bl-step .st-input { max-width: 420px; }
+
+    .bl-cal { background: #0d1733; border: 1px solid #2a3a66; border-radius: 10px; padding: 10px; width: 100%; max-width: 360px; user-select: none; }
+    .bl-cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: #fff; font-weight: 600; }
+    .bl-cal-nav { border: 0; background: transparent; color: var(--text-light); cursor: pointer; font-size: 14px; padding: 4px 10px; border-radius: 6px; }
+    .bl-cal-nav:hover:not(:disabled) { background: #1b2a4e; }
+    .bl-cal-nav:disabled { color: #3c4870; cursor: not-allowed; }
+    .bl-cal table { width: 100%; border-collapse: collapse; text-align: center; }
+    .bl-cal th { color: var(--text-muted); font-size: 12px; font-weight: 600; padding: 4px 0; }
+    .bl-cal td { padding: 2px; }
+    .bl-cal .day { width: 100%; height: 34px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-light); cursor: pointer; font-size: 14px; }
+    .bl-cal .day:hover:not(:disabled) { background: #1b2a4e; }
+    .bl-cal .day:disabled { color: #3c4870; cursor: not-allowed; }
+    .bl-cal .day.first { border-color: var(--accent-blue-light); }
+    .bl-cal .day.sel { background: var(--accent-blue); color: #fff; }
+    .bl-cal .day.span { background: #1e3f7a; color: #fff; }
+    .bl-cal .day.mine { box-shadow: inset 0 0 0 2px #2fbf71; }
+    .bl-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 2px; font-size: 12px; color: var(--text-muted); }
+    .bl-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+    .bl-legend .lg-sel { background: var(--accent-blue); }
+    .bl-legend .lg-span { background: #1e3f7a; }
+    .bl-legend .lg-mine { box-shadow: inset 0 0 0 2px #2fbf71; }
+
+    .bl-summary { position: sticky; top: 70px; }
+    .bl-summary .st-dl { grid-template-columns: 90px 1fr; }
+    .bl-summary dd.empty { color: #6f7ca0; }
+    .bl-price { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid #2a3557; margin-top: 14px; padding-top: 12px; }
+    .bl-price b { font-size: 22px; color: #fff; }
+
+    @@media (max-width: 1199px) { .bl-cols { grid-template-columns: 1fr; } .bl-right .bl-step { border-top: 1px solid #22325a; padding-top: 16px; } }
+    @@media (max-width: 991px) { .bl-layout { grid-template-columns: 1fr; } .bl-summary { position: static; } }
+</style>
+
+<div class="st-head">
+    <div>
+        <h2>Book a lesson</h2>
+        <p>Choose a package, an instructor, a date and a time. You pay by card or EFT straight after.</p>
+    </div>
+</div>
+
+@if (ViewBag.Eligibility != null)
+{
+    <div class="st-alert @(canBook ? "info" : "warn")">
+        @ViewBag.Eligibility
+        @if (!canBook)
+        {
+            <text> </text><a href="@Url.Action("Profile", "Student")">Go to my profile</a>
+        }
+    </div>
+}
+
+@using (Html.BeginForm("BookLesson", "Student", FormMethod.Post, new { id = "bookForm", autocomplete = "off" }))
+{
+    @Html.AntiForgeryToken()
+    <input type="hidden" id="bookingDate" name="bookingDate" value="@Model.SelectedDate" />
+
+    <div class="bl-layout">
+        <div class="st-card" style="margin-bottom:0;">
+            <div class="bl-step" data-step="packageId">
+                <div class="bl-num">1</div>
+                <div>
+                    <h4>Package</h4>
+                    <select class="st-input" id="packageId" name="packageId">
+                        <option value="">Choose a package</option>
+                        @foreach (var p in Model.Packages)
+                        {
+                            int lessonCount = Model.PackageLessons.ContainsKey(p.Id) ? Model.PackageLessons[p.Id] : SnisDrivingSchool.LessonPlan.MinLessons;
+                            <option value="@p.Id" data-lessons="@lessonCount" @(p.Id == Model.SelectedPackageId ? "selected" : "")>@p.Text</option>
+                        }
+                    </select>
+                    <span class="st-hint">The licence code is worked out from the licence on your profile.</span>
+                </div>
+            </div>
+            <div class="bl-cols">
+                <div>
+                    <div class="bl-step" data-step="instructorId">
+                        <div class="bl-num">2</div>
+                        <div>
+                            <h4>Instructor</h4>
+                            <select class="st-input" id="instructorId" name="instructorId">
+                                <option value="">Choose an instructor</option>
+                                @foreach (var i in Model.Instructors)
+                                {
+                                    <option value="@i.Id" @(i.Id == Model.SelectedInstructorId ? "selected" : "")>@i.Text</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bl-step" data-step="tsId">
+                        <div class="bl-num">3</div>
+                        <div>
+                            <h4>Time</h4>
+                            <select class="st-input" id="tsId" name="tsId">
+                                <option value="">Choose a time</option>
+                                @foreach (var t in Model.TimeSlots)
+                                {
+                                    <option value="@t.Id" @(t.Id == Model.SelectedTsId ? "selected" : "")>@t.Text</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="bl-right">
+                    <div class="bl-step" data-step="bookingDate">
+                        <div class="bl-num">4</div>
+                        <div>
+                            <h4>Date</h4>
+                            <div class="bl-cal" id="cal" data-min="@Model.MinDate" data-max="@Model.MaxDate" data-booked="@string.Join(",", Model.BookedMonths)" data-mine="@string.Join(",", Model.LessonDays)"></div>
+                            <div class="bl-legend">
+                                <span><i class="lg-sel"></i>First lesson</span>
+                                <span><i class="lg-span"></i>Your other lessons in this package</span>
+                                <span><i class="lg-mine"></i>Lessons you already booked</span>
+                            </div>
+                            <span class="st-hint">Book at least 3 days ahead: the earliest date is @earliest.ToString("dddd d MMMM"). You can book up to 2 months ahead, and one booking per month. Every package has at least 3 lessons, one a day at the same time (no lessons on Sundays).</span>
+                            <span class="st-hint" id="calBooked" style="color:#ffd89c;display:none;">You already have a booking this month, so its days are greyed out. Pick another month.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="st-card bl-summary">
+            <h3>Your booking</h3>
+            <p class="st-sub">@Model.StudentFirstName @Model.StudentLastName</p>
+            <dl class="st-dl">
+                <dt>Package</dt><dd id="sumPackage" class="empty">Not chosen</dd>
+                <dt>Instructor</dt><dd id="sumInstructor" class="empty">Not chosen</dd>
+                <dt>Lessons</dt><dd id="sumLessons" class="empty">Not chosen</dd>
+                <dt>Dates</dt><dd id="sumDate" class="empty">Not chosen</dd>
+                <dt>Time</dt><dd id="sumTime" class="empty">Not chosen</dd>
+            </dl>
+            <div class="bl-price"><span style="color:var(--text-muted)">Price</span><b id="sumPrice">-</b></div>
+            <div class="st-actions" style="flex-direction:column;">
+                <button type="submit" class="st-btn primary" id="btnBook" @(canBook || ViewBag.Eligibility == null ? "" : "disabled")>Book and go to payment</button>
+                <button type="button" class="st-btn" id="btnClear">Start again</button>
+            </div>
+            <span class="st-hint" style="margin-top:10px;">Your booking stays <b>Pending</b> until you pay. Once paid it is <b>Booked</b>.</span>
+        </div>
+    </div>
+}
+
+<script>
+    (function () {
+        function parse(s) { var a = s.split('-'); return new Date(+a[0], +a[1] - 1, +a[2]); }
+        function pad(n) { return n < 10 ? '0' + n : '' + n; }
+        function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+        var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        function nice(d) { return days[d.getDay()] + ' ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear(); }
+
+        var cal = document.getElementById('cal');
+        var min = parse(cal.getAttribute('data-min'));   // today + 3 days
+        var max = parse(cal.getAttribute('data-max'));   // today + 2 months
+        var hidden = document.getElementById('bookingDate');
+        var selected = hidden.value ? parse(hidden.value) : null;
+        var booked = (cal.getAttribute('data-booked') || '').split(',').filter(function (x) { return x; });
+        function monthKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+        var mine = (cal.getAttribute('data-mine') || '').split(',').filter(function (x) { return x; });
+
+        // The package's lessons: one a day from the start date, Sundays skipped (same rule as the server)
+        function lessonCount() { var o = pkg.value ? pkg.options[pkg.selectedIndex] : null; return o ? Math.max(3, parseInt(o.getAttribute('data-lessons'), 10) || 3) : 1; }
+        function lessonDays() {
+            var out = [];
+            if (!selected) return out;
+            var d = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate());
+            while (out.length < lessonCount()) { if (d.getDay() !== 0) out.push(iso(d)); d.setDate(d.getDate() + 1); }
+            return out;
+        }
+        function shortDate(d) { return days[d.getDay()].slice(0, 3) + ' ' + d.getDate() + ' ' + months[d.getMonth()].slice(0, 3); }
+        var view = new Date((selected || min).getFullYear(), (selected || min).getMonth(), 1);
+        var pkg = document.getElementById('packageId'), ins = document.getElementById('instructorId'), ts = document.getElementById('tsId');
+
+        function setSum(id, text) {
+            var el = document.getElementById(id);
+            el.textContent = text || 'Not chosen';
+            el.className = text ? '' : 'empty';
+        }
+        function chosenText(sel) { return sel.value ? sel.options[sel.selectedIndex].text : ''; }
+
+        function summary() {
+            var p = chosenText(pkg), cut = p.lastIndexOf(' - R');
+            setSum('sumPackage', cut > 0 ? p.substring(0, cut) : p);
+            document.getElementById('sumPrice').textContent = cut > 0 ? p.substring(cut + 3) : '-';
+            setSum('sumInstructor', chosenText(ins));
+            var ld = lessonDays(), n = lessonCount();
+            setSum('sumLessons', pkg.value ? n + (n === 1 ? ' lesson' : ' lessons') : '');
+            if (selected && ld.length > 1) setSum('sumDate', shortDate(selected) + ' to ' + shortDate(parse(ld[ld.length - 1])) + ' (' + ld.length + ' days, no Sundays)');
+            else setSum('sumDate', selected ? nice(selected) : '');
+            setSum('sumTime', chosenText(ts));
+            Array.prototype.forEach.call(document.querySelectorAll('.bl-step'), function (s) {
+                var f = document.getElementById(s.getAttribute('data-step'));
+                s.classList.toggle('done', !!(f && f.value));
+            });
+        }
+
+        function render() {
+            var y = view.getFullYear(), m = view.getMonth(), span = lessonDays();
+            var firstDay = new Date(y, m, 1).getDay(), count = new Date(y, m + 1, 0).getDate();
+            var prevOff = new Date(y, m, 0) < min, nextOff = new Date(y, m + 1, 1) > max;
+            var html = '<div class="bl-cal-head">' +
+                '<button type="button" class="bl-cal-nav" id="calPrev"' + (prevOff ? ' disabled' : '') + ' aria-label="Previous month">&#9664;</button>' +
+                '<span>' + months[m] + ' ' + y + '</span>' +
+                '<button type="button" class="bl-cal-nav" id="calNext"' + (nextOff ? ' disabled' : '') + ' aria-label="Next month">&#9654;</button></div>' +
+                '<table><thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead><tbody><tr>';
+            for (var i = 0; i < firstDay; i++) html += '<td></td>';
+            for (var d = 1; d <= count; d++) {
+                var date = new Date(y, m, d), cls = 'day';
+                if (iso(date) === iso(min)) cls += ' first';
+                if (selected && iso(date) === iso(selected)) cls += ' sel';
+                else if (span.indexOf(iso(date)) >= 0) cls += ' span';
+                if (mine.indexOf(iso(date)) >= 0) cls += ' mine';
+                var off = (date < min || date > max || date.getDay() === 0 || booked.indexOf(monthKey(date)) >= 0) ? ' disabled' : '';
+                html += '<td><button type="button" class="' + cls + '" data-date="' + iso(date) + '"' + off + '>' + d + '</button></td>';
+                if ((firstDay + d) % 7 === 0 && d < count) html += '</tr><tr>';
+            }
+            cal.innerHTML = html + '</tr></tbody></table>';
+            document.getElementById('calBooked').style.display = booked.indexOf(monthKey(view)) >= 0 ? '' : 'none';
+            document.getElementById('calPrev').onclick = function () { view = new Date(y, m - 1, 1); render(); };
+            document.getElementById('calNext').onclick = function () { view = new Date(y, m + 1, 1); render(); };
+            Array.prototype.forEach.call(cal.querySelectorAll('.day:not([disabled])'), function (btn) {
+                btn.onclick = function () {
+                    selected = parse(btn.getAttribute('data-date'));
+                    hidden.value = iso(selected);
+                    render(); summary();
+                };
+            });
+        }
+
+        [ins, ts].forEach(function (s) { s.addEventListener('change', summary); });
+        pkg.addEventListener('change', function () { render(); summary(); });   // the number of lessons changes the highlighted days
+
+        document.getElementById('btnClear').addEventListener('click', function () {
+            pkg.value = ''; ins.value = ''; ts.value = '';
+            selected = null; hidden.value = '';
+            view = new Date(min.getFullYear(), min.getMonth(), 1);
+            render(); summary();
+        });
+
+        document.getElementById('bookForm').addEventListener('submit', function (e) {
+            var missing = [];
+            if (!pkg.value) missing.push('a package');
+            if (!ins.value) missing.push('an instructor');
+            if (!hidden.value) missing.push('a date');
+            if (!ts.value) missing.push('a time');
+            if (missing.length) { e.preventDefault(); alert('Please choose ' + missing.join(', ') + '.'); }
+        });
+
+        render(); summary();
+    })();
+</script>

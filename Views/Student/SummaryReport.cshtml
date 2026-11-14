@@ -1,0 +1,83 @@
+﻿@model SnisDrivingSchool.Models.SummaryReportViewModel
+@using SnisDrivingSchool.Models
+@{
+    Layout = "~/Views/Student/_StudentLayout.cshtml";
+    ViewBag.Title = "Payment Summary Report";
+    ViewBag.Active = "Payment";
+    var s = Model.Student;
+}
+
+<div class="st-head">
+    <div>
+        <h2>Payment summary</h2>
+        <p>Sni's Driving School · confirmed payments only · generated @Model.Generated.ToString("d MMMM yyyy, HH:mm")</p>
+    </div>
+    <div class="st-head-actions st-no-print">
+        <a class="st-btn" href="@Url.Action("Bookings", "Student")">&larr; My bookings</a>
+        <button type="button" class="st-btn primary" onclick="window.print()">Print report</button>
+    </div>
+</div>
+
+<div class="st-stats" style="grid-template-columns:repeat(3, minmax(0, 1fr));">
+    <div class="st-stat"><div class="l">Payments recorded</div><div class="v">@Model.PaymentCount</div><div class="d">confirmed by reception</div></div>
+    <div class="st-stat"><div class="l">Total paid</div><div class="v">@Fmt.Rand(Model.TotalPaid)</div><div class="d">after refunds</div></div>
+    <div class="st-stat"><div class="l">Student</div><div class="v" style="font-size:18px;padding:5px 0 4px;">@(s == null ? "-" : s.Name + " " + s.Surname)</div><div class="d">@(s == null ? "" : "Student number " + s.StudentId)</div></div>
+</div>
+
+@if (s != null)
+{
+    <div class="st-card">
+        <h3>Student details</h3>
+        <p class="st-sub">As on file</p>
+        <div class="st-grid-2">
+            <dl class="st-dl">
+                <dt>Name</dt><dd>@s.Name @s.Surname</dd>
+                <dt>Username</dt><dd>@s.UserName</dd>
+                <dt>Status</dt><dd>@s.Status</dd>
+            </dl>
+            <dl class="st-dl">
+                <dt>Phone</dt><dd>@s.PhoneNumber</dd>
+                <dt>Email</dt><dd>@s.Email</dd>
+                <dt>Address</dt><dd>@(string.IsNullOrEmpty(s.Address) ? "-" : s.Address)</dd>
+            </dl>
+        </div>
+    </div>
+}
+
+<div class="st-card">
+    <h3>Bookings and payments</h3>
+    <p class="st-sub">Every booking with a confirmed payment</p>
+    <div class="st-table-wrap">
+        <table class="st-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Lesson</th>
+                    <th>Date &amp; time</th>
+                    <th>Status</th>
+                    <th>Method</th>
+                    <th class="num">Price</th>
+                    <th class="num">Paid</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Bookings.Count == 0)
+                {
+                    <tr><td colspan="7" class="st-empty">No confirmed payments yet.</td></tr>
+                }
+                @foreach (var b in Model.Bookings)
+                {
+                    <tr>
+                        <td>@b.BookingId</td>
+                        <td>@b.PackageName<span class="st-small">@(string.IsNullOrEmpty(b.InstructorName) ? "No instructor" : "with " + b.InstructorName)</span></td>
+                        <td class="nowrap">@b.BookingDate.ToString("yyyy/MM/dd")<span class="st-small">@b.TimeText</span></td>
+                        <td><span class="st-badge @StudentUi.StatusCss(b)">@b.DisplayStatus</span></td>
+                        <td>@b.PaymentMethod</td>
+                        <td class="num">@Fmt.Rand(b.Price)</td>
+                        <td class="num">@Fmt.Rand(b.PaidAmount ?? 0m)@(b.Refunded ? " (refunded)" : "")<span class="st-small">@(b.PaidOn.HasValue ? b.PaidOn.Value.ToString("yyyy/MM/dd") : "")</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

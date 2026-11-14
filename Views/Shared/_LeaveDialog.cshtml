@@ -1,0 +1,60 @@
+@model string
+@* "Record leave" pop-up for an instructor (Manager and Receptionist Staff pages). Model = controller name.
+   Opened by any button with data-leave="instructorId" data-name="Full name". *@
+<style>
+    dialog.lv-dialog { background: var(--navy-mid, #14213d); color: var(--text-light, #f4f6fb); border: 1px solid #2a3557; border-radius: 10px; padding: 0; width: 520px; max-width: calc(100vw - 32px); }
+    dialog.lv-dialog::backdrop { background: rgba(5, 10, 25, .7); }
+    .lv-head { padding: 14px 20px; border-bottom: 1px solid #2a3557; font-size: 18px; }
+    .lv-body { padding: 16px 20px; }
+    .lv-body .form-control-custom { width: 100%; max-width: none; box-sizing: border-box; }
+    .lv-foot { padding: 12px 20px; border-top: 1px solid #2a3557; text-align: right; }
+    .lv-foot .btn-outline-accent { margin-right: 8px; }
+    .lv-hint { display: block; color: var(--text-muted, #b8c2d9); font-size: 12px; margin-top: 6px; }
+    .lv-tag { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #2c2350; color: #c9b8ff; white-space: nowrap; }
+    .lv-x { background: none; border: 0; color: #ff9c9c; cursor: pointer; font-size: 13px; padding: 0 0 0 4px; }
+</style>
+<dialog class="lv-dialog" id="leaveDialog">
+    @using (Html.BeginForm("SetLeave", Model, FormMethod.Post, new { autocomplete = "off" }))
+    {
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="instructorId" id="lvId" />
+        <div class="lv-head">Record leave for <span id="lvName"></span></div>
+        <div class="lv-body form-2col">
+            <div class="form-group-custom">
+                <label for="lvFrom">First day of leave</label>
+                <input type="date" id="lvFrom" name="fromDate" class="form-control-custom" min="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+            </div>
+            <div class="form-group-custom">
+                <label for="lvTo">Last day of leave</label>
+                <input type="date" id="lvTo" name="toDate" class="form-control-custom" min="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+            </div>
+            <div class="form-group-custom full">
+                <label for="lvNote">Note (optional)</label>
+                <input type="text" id="lvNote" name="note" class="form-control-custom" maxlength="200" placeholder="e.g. Annual leave" />
+                <span class="lv-hint">On these days the instructor can't be booked. Lessons they already have on those days are offered to another free instructor, and the students are asked to accept.</span>
+            </div>
+        </div>
+        <div class="lv-foot">
+            <button type="button" class="btn-outline-accent" onclick="document.getElementById('leaveDialog').close()">Cancel</button>
+            <button type="submit" class="btn-accent">Save leave</button>
+        </div>
+    }
+</dialog>
+<script>
+    (function () {
+        var dlg = document.getElementById('leaveDialog');
+        Array.prototype.forEach.call(document.querySelectorAll('[data-leave]'), function (btn) {
+            btn.addEventListener('click', function () {
+                document.getElementById('lvId').value = btn.getAttribute('data-leave');
+                document.getElementById('lvName').textContent = btn.getAttribute('data-name');
+                document.getElementById('lvFrom').value = ''; document.getElementById('lvTo').value = ''; document.getElementById('lvNote').value = '';
+                dlg.showModal();
+            });
+        });
+        document.getElementById('lvFrom').addEventListener('change', function () {
+            var to = document.getElementById('lvTo');
+            to.min = this.value;
+            if (!to.value || to.value < this.value) to.value = this.value;
+        });
+    })();
+</script>

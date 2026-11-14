@@ -1,0 +1,79 @@
+@model SnisDrivingSchool.StudentApproval.State
+@{
+    Layout = "~/Views/Student/_StudentLayout.cshtml";
+    ViewBag.Title = "Verify your account";
+    ViewBag.Active = "Home";
+    string demoCode = TempData["DemoCode"] as string;
+}
+
+<style>
+    .vf-wrap { max-width: 560px; }
+    .vf-steps { display: flex; gap: 8px; margin: 0 0 18px; flex-wrap: wrap; }
+    .vf-steps span { padding: 5px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; background: #1b2a4e; color: var(--text-muted); }
+    .vf-steps span.on { background: var(--accent-blue); color: #fff; }
+    .vf-steps span.done { background: #1b4a2b; color: #9cffb0; }
+    .vf-code { font-size: 28px !important; letter-spacing: 10px; text-align: center; height: 60px !important; font-weight: 700; }
+    .vf-demo { background: #3a2e12; border: 1px dashed #c98500; color: #ffe2a8; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; }
+    .vf-demo b { font-size: 22px; letter-spacing: 4px; color: #fff; }
+</style>
+
+<div class="vf-wrap">
+    <div class="st-head">
+        <div>
+            <h2>Verify your account</h2>
+            <p>Welcome@(Model == null ? "" : ", " + Model.Name)! Enter the 6-digit code to confirm your registration.</p>
+        </div>
+    </div>
+
+    <div class="vf-steps">
+        <span class="done">1. Register</span>
+        <span class="on">2. Verify</span>
+        <span>3. Approval by reception</span>
+        <span>4. Book &amp; pay</span>
+    </div>
+
+    <div class="st-card">
+        @if (demoCode != null)
+        {
+            <div class="vf-demo">
+                The email could not be sent right now (for example, no internet).<br />
+                Demo code: <b>@demoCode</b>
+            </div>
+        }
+        else
+        {
+            <p style="margin-top:0;">
+                We sent a 6-digit code to <b>@ViewBag.Email</b>.
+                <span class="st-small">Check the inbox and spam folder for the email address on your account.</span>
+            </p>
+        }
+
+        @using (Html.BeginForm("Verify", "Student", FormMethod.Post, new { autocomplete = "off" }))
+        {
+            @Html.AntiForgeryToken()
+            <div class="st-field">
+                <label for="code">Verification code</label>
+                <input type="text" id="code" name="code" class="st-input vf-code" inputmode="numeric" maxlength="6"
+                       pattern="[0-9]{6}" title="6 digits" placeholder="••••••" required autofocus />
+                <span class="st-hint">The code expires @SnisDrivingSchool.StudentApproval.CodeMinutes minutes after it was sent.</span>
+            </div>
+            <div class="st-actions">
+                <button type="submit" class="st-btn primary">Verify</button>
+            </div>
+        }
+
+        @using (Html.BeginForm("ResendCode", "Student", FormMethod.Post, new { style = "margin-top:14px;" }))
+        {
+            @Html.AntiForgeryToken()
+            <span class="st-small" style="display:inline;">Didn't get it, or did it expire?</span>
+            <button type="submit" class="st-btn small" style="margin-left:6px;">Send a new code</button>
+        }
+    </div>
+</div>
+
+<script>
+    (function () {
+        var box = document.getElementById('code');
+        box.addEventListener('input', function () { box.value = box.value.replace(/\D/g, '').slice(0, 6); });
+    })();
+</script>

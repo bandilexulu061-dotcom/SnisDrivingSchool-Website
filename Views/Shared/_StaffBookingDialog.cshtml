@@ -1,0 +1,126 @@
+@model SnisDrivingSchool.StaffBookingFormVm
+@{
+    var form = Model.Form ?? new Dictionary<string, string>();
+    Func<string, string> val = k => form.ContainsKey(k) ? form[k] : "";
+    var lists = Model.Lists ?? new SnisDrivingSchool.StaffBookingLists();
+}
+@* "New booking" pop-up shared by the manager and receptionist Bookings pages.
+   Open it with any button that has the attribute data-open-booking. *@
+
+<style>
+    dialog.sb-dialog {
+        background: var(--navy-mid, #14213d); color: var(--text-light, #f4f6fb); border: 1px solid #2a3557;
+        border-radius: 10px; padding: 0; width: 480px; max-width: calc(100vw - 32px);
+    }
+    dialog.sb-dialog::backdrop { background: rgba(5, 10, 25, .7); }
+    .sb-head { padding: 14px 20px; border-bottom: 1px solid #2a3557; display: flex; align-items: center; }
+    .sb-head h4 { margin: 0; font-size: 18px; }
+    .sb-head button { margin-left: auto; background: none; border: 0; color: var(--text-muted, #b8c2d9); font-size: 22px; cursor: pointer; }
+    .sb-body { padding: 16px 20px; max-height: 70vh; overflow: auto; }
+    .sb-body .form-control-custom { width: 100%; max-width: none; box-sizing: border-box; }
+    .sb-body select.form-control-custom { height: 42px; }
+    .sb-foot { padding: 12px 20px; border-top: 1px solid #2a3557; text-align: right; }
+    .sb-foot .btn-outline-accent { margin-right: 8px; }
+    .sb-error { background: #4a1b1b; color: #ffb3b3; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; }
+    .sb-hint { display: block; color: var(--text-muted, #b8c2d9); font-size: 12px; margin-top: 4px; }
+</style>
+
+<dialog class="sb-dialog dlg-wide" id="staffBookingDialog">
+    @using (Html.BeginForm("AddBooking", Model.Controller, FormMethod.Post, new { autocomplete = "off" }))
+    {
+        @Html.AntiForgeryToken()
+        <div class="sb-head"><h4>Book a lesson for a learner</h4><button type="button" data-close-booking aria-label="Close">&times;</button></div>
+        <div class="sb-body form-2col">
+            @if (!string.IsNullOrEmpty(Model.Error))
+            {
+                <div class="sb-error">@Model.Error</div>
+            }
+            <div class="form-group-custom full">
+                <label>Learner</label>
+                <input type="text" id="sbStudentSearch" class="form-control-custom" placeholder="Type a name or student number to search" style="margin-bottom:8px;" />
+                <select name="studentId" id="sbStudent" class="form-control-custom" required>
+                    <option value="">Choose a learner (@lists.Students.Count)</option>
+                    @foreach (var x in lists.Students)
+                    {
+                        <option value="@x.Id" @(val("studentId") == x.Id.ToString() ? "selected" : "")>@x.Text</option>
+                    }
+                </select>
+                <span class="sb-hint">Needs a valid ID (17+), a licence on file with its PDF. The code is automatic: learner's &rarr; Code 8, Code 8 &rarr; 10, Code 10 &rarr; 14, Code 14 &rarr; Refresher only.</span>
+            </div>
+            <div class="form-group-custom">
+                <label>Instructor</label>
+                <select name="instructorId" class="form-control-custom" required>
+                    <option value="">Choose an instructor</option>
+                    @foreach (var x in lists.Instructors)
+                    {
+                        <option value="@x.Id" @(val("instructorId") == x.Id.ToString() ? "selected" : "")>@x.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group-custom">
+                <label>Package</label>
+                <select name="packageId" class="form-control-custom" required>
+                    <option value="">Choose a package</option>
+                    @foreach (var x in lists.Packages)
+                    {
+                        <option value="@x.Id" @(val("packageId") == x.Id.ToString() ? "selected" : "")>@x.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group-custom">
+                <label>Time</label>
+                <select name="tsId" class="form-control-custom" required>
+                    <option value="">Choose a time</option>
+                    @foreach (var x in lists.TimeSlots)
+                    {
+                        <option value="@x.Id" @(val("tsId") == x.Id.ToString() ? "selected" : "")>@x.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group-custom">
+                <label>Date</label>
+                <input type="date" name="bookingDate" class="form-control-custom" value="@val("bookingDate")"
+                       min="@SnisDrivingSchool.Cancellation.EarliestBookingDate.ToString("yyyy-MM-dd")" max="@DateTime.Today.AddMonths(2).ToString("yyyy-MM-dd")" required />
+                <span class="sb-hint">From @SnisDrivingSchool.Cancellation.EarliestBookingDate.ToString("d MMM") (at least 3 days ahead) up to two months ahead, one booking per student per month. Saved as Pending until it is paid.</span>
+            </div>
+        </div>
+        <div class="sb-foot">
+            <button type="button" class="btn-outline-accent" data-close-booking>Cancel</button>
+            <button type="submit" class="btn-accent">Save booking</button>
+        </div>
+    }
+</dialog>
+
+@if (Model.Open)
+{
+    <div id="sbOpenFlag" style="display:none"></div>
+}
+
+<script>
+    (function () {
+        var dlg = document.getElementById('staffBookingDialog');
+        if (!dlg) return;
+        function open() { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', 'open'); }
+        function close() { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); }
+        Array.prototype.forEach.call(document.querySelectorAll('[data-open-booking]'), function (b) { b.addEventListener('click', open); });
+        Array.prototype.forEach.call(dlg.querySelectorAll('[data-close-booking]'), function (b) { b.addEventListener('click', close); });
+        if (document.getElementById('sbOpenFlag')) open();
+
+        // Search box filters the learner list
+        var sel = document.getElementById('sbStudent'), box = document.getElementById('sbStudentSearch');
+        var all = [];
+        for (var i = 1; i < sel.options.length; i++) all.push({ v: sel.options[i].value, t: sel.options[i].text });
+        var firstText = sel.options[0].text;
+        box.addEventListener('input', function () {
+            var q = box.value.toLowerCase().trim(), cur = sel.value, n = 0;
+            while (sel.options.length > 1) sel.remove(1);
+            all.forEach(function (x) {
+                if (x.t.toLowerCase().indexOf(q) > -1) {
+                    var o = new Option(x.t, x.v); if (x.v === cur) o.selected = true; sel.add(o); n++;
+                }
+            });
+            sel.options[0].text = n === 0 ? 'No learners match' : (q ? 'Choose a learner (' + n + ' found)' : firstText);
+            if (q && n === 1) sel.selectedIndex = 1;
+        });
+    })();
+</script>

@@ -1,0 +1,257 @@
+﻿@model List<SnisDrivingSchool.Models.MgrStudentRow>
+@using SnisDrivingSchool.Models
+@{
+    ViewBag.Title = "Manager - Students";
+    ViewBag.Active = "Students";
+    var form = ViewBag.Form as Dictionary<string, string> ?? new Dictionary<string, string>();
+    Func<string, string> f = k => form.ContainsKey(k) ? form[k] : "";
+    bool showStatus = false;
+    foreach (var x in Model) { if (!string.IsNullOrEmpty(x.Status)) { showStatus = true; break; } }
+}
+@Html.Partial("_ManagerNav")
+
+<div class="manager-header">
+    <h2>Students</h2>
+    <p>View registered students and register new ones.</p>
+</div>
+
+
+<div class="manager-panel">
+    <div class="manager-panel-header">
+        <h3>Students (<span id="rowCount">@Model.Count</span>)</h3>
+        <button type="button" class="btn-accent" data-toggle="modal" data-target="#addStudentModal">+ Add student</button>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="contact-success-message">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="login-error">@TempData["Error"]</div>
+    }
+    @if (ViewBag.Error != null)
+    {
+        <div class="login-error">@ViewBag.Error</div>
+    }
+
+    <div class="search-bar">
+        <input type="text" class="form-control-custom" data-table-search="studentsTable"
+               placeholder="Search students by name, email, phone or username" />
+    </div>
+
+    <div class="m-table-wrap">
+        <table class="m-table" id="studentsTable">
+            <thead>
+                <tr>
+                    <th>Student ID</th>
+                    <th>Account</th>
+                    <th>ID number</th>
+                    <th>Age</th>
+                    <th>Licence eligibility</th>
+                    <th>Current licence</th>
+                    <th>ID PDF</th>
+                    <th>Licence PDF</th>
+                    <th>Username</th>
+                    <th>Name</th>
+                    <th>Surname</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Address</th>
+                    @if (showStatus)
+                    {
+                        <th>Status</th>
+}
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="16">No students found.</td></tr>
+                }
+                @foreach (var s in Model)
+                {
+                    var sid = SnisDrivingSchool.SaIdNumber.Parse(s.IdNumber);
+                    <tr data-row="1">
+                        <td>@s.StudentId</td>
+                        @{ var stage = SnisDrivingSchool.StudentApproval.ParseStage(s.Stage); }
+                        <td><span class="m-badge m-@SnisDrivingSchool.StudentApproval.StageCss(stage)">@SnisDrivingSchool.StudentApproval.StageText(stage)</span></td>
+                        <td>@s.IdNumber</td>
+                        <td>@(sid.IsValid ? sid.Age.ToString() : "")</td>
+                        <td><span class="m-badge @sid.EligibilityCss" title="@sid.EligibilityText">@sid.EligibilityLabel</span></td>
+                        <td>@SnisDrivingSchool.Licence.StatusText(s.LicenceStatus)</td>
+                        <td style="white-space:nowrap">
+                            @if (s.IdDocumentId > 0)
+                            {
+                                <a href="@Url.Action("Open", "Documents", new { id = s.IdDocumentId })" target="_blank" class="doc-act">View PDF</a>
+                            }
+                            else
+                            {
+                                <span class="doc-missing">Missing</span>
+                            }
+                            <button type="button" class="doc-act" data-upload-student="@s.StudentId" data-upload-name="@(s.Name + " " + s.Surname)" data-upload-type="ID">Upload</button>
+                        </td>
+                        <td style="white-space:nowrap">
+                            @if (!SnisDrivingSchool.Licence.NeedsDocument(s.LicenceStatus) && SnisDrivingSchool.Licence.IsStatus(s.LicenceStatus))
+                            {
+                                <span style="color:var(--text-muted);font-size:12px;margin-right:4px;">Not needed</span>
+                            }
+                            else if (s.DocumentId > 0)
+                            {
+                                <a href="@Url.Action("Open", "Documents", new { id = s.DocumentId })" target="_blank" class="doc-act">View PDF</a>
+                            }
+                            else
+                            {
+                                <span class="doc-missing">Missing</span>
+                            }
+                            <button type="button" class="doc-act" data-upload-student="@s.StudentId" data-upload-name="@(s.Name + " " + s.Surname)" data-upload-status="@SnisDrivingSchool.Licence.Normalize(s.LicenceStatus)">Upload</button>
+                        </td>
+                        <td>@s.UserName</td>
+                        <td>@s.Name</td>
+                        <td>@s.Surname</td>
+                        <td>@s.Phone</td>
+                        <td>@s.Email</td>
+                        <td>@s.Address</td>
+                        @if (showStatus)
+                        {
+                            <td><span class="m-badge @MgrUi.Badge(s.Status)">@s.Status</span></td>
+                        }
+                        <td style="white-space:nowrap">
+                            <a class="m-act" href="@Url.Action("Reports", "Manager", new { studentId = s.StudentId, year = 0, tab = "students" })" title="Bookings and payments report for this student">Report</a>
+                            @using (Html.BeginForm("DeleteStudent", "Manager", FormMethod.Post, new { @class = "m-inline",
+                                onsubmit = "return confirm('Delete " + (s.Name + " " + s.Surname).Replace("'", "") + "?" + (s.BookingCount > 0 ? " Their " + s.BookingCount + " unpaid/cancelled booking(s) will also be removed." : "") + " This cannot be undone.');" }))
+                            {
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@s.StudentId" />
+                                <button type="submit" class="m-act bad">Delete</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (ViewBag.OpenModal == true)
+{
+    <div id="openModalFlag" data-modal="addStudentModal" style="display:none"></div>
+}
+
+<!-- Add Student Modal -->
+<div class="modal fade" id="addStudentModal" tabindex="-1" role="dialog" aria-labelledby="addStudentModalLabel">
+    <div class="modal-dialog modal-wide" role="document">
+        <div class="modal-content modal-content-custom">
+            @using (Html.BeginForm("AddStudent", "Manager", FormMethod.Post, new { autocomplete = "off", enctype = "multipart/form-data" }))
+            {
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="addStudentModalLabel">Register new student</h4>
+                </div>
+                <div class="modal-body form-2col">
+                    @if (ViewBag.ModalError != null)
+                    {
+                        <div class="login-error">@ViewBag.ModalError</div>
+                    }
+                    <div class="form-group-custom">
+                        <label>First name</label>
+                        <input type="text" name="name" class="form-control-custom" maxlength="50" value="@f("name")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Surname</label>
+                        <input type="text" name="surname" class="form-control-custom" maxlength="50" value="@f("surname")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Username</label>
+                        <input type="text" name="userName" class="form-control-custom" maxlength="50" value="@f("userName")" />
+                        <span class="m-hint">3 to 50 characters, no spaces.</span>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Phone number</label>
+                        <input type="text" name="phone" class="form-control-custom" maxlength="15" value="@f("phone")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Email</label>
+                        <input type="text" name="email" class="form-control-custom" maxlength="50" value="@f("email")" />
+                        <span class="m-hint">The student can log in with this email or their username.</span>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Address</label>
+                        <input type="text" name="address" class="form-control-custom" maxlength="50" value="@f("address")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>South African ID number</label>
+                        <input type="text" name="idNumber" class="form-control-custom" maxlength="13" inputmode="numeric" value="@f("idNumber")" />
+                        <span class="m-hint">Must be 17 or older (learner's licence age).</span>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Current licence</label>
+                        <select name="licenceStatus" class="form-control-custom" >
+                    <option value="">-- Choose --</option>
+                    @foreach (var o in SnisDrivingSchool.Licence.StatusOptions)
+                    {
+                        <option value="@o.Key" @(f("licenceStatus") == o.Key ? "selected" : "")>@o.Value</option>
+                    }
+                </select>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>ID document PDF</label>
+                        <input type="file" name="idDocument" accept="application/pdf,.pdf" class="form-control-custom" required />
+                        <small style="display:block;color:var(--text-muted);margin-top:4px;">Copy of the student's ID book or card. PDF up to 3 MB.</small>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Licence PDF</label>
+                        <input type="file" name="licenceDocument" accept="application/pdf,.pdf" class="form-control-custom" required />
+                        <small style="display:block;color:var(--text-muted);margin-top:4px;">Copy of the licence chosen above. PDF up to 3 MB.</small>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Password</label>
+                        <input type="password" name="password" class="form-control-custom" maxlength="50" autocomplete="new-password" />
+                        <span class="m-hint">At least 6 characters.</span>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Confirm password</label>
+                        <input type="password" name="confirmPassword" class="form-control-custom" maxlength="50" autocomplete="new-password" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label style="margin-right:15px;">
+                            <input type="radio" name="pwView" value="hide" checked
+                                   onchange="var f=this.form;f.elements['password'].type='password';f.elements['confirmPassword'].type='password';" /> Hide passwords
+                        </label>
+                        <label>
+                            <input type="radio" name="pwView" value="show"
+                                   onchange="var f=this.form;f.elements['password'].type='text';f.elements['confirmPassword'].type='text';" /> Show passwords
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline-accent" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-accent">Save student</button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@Html.Partial("_LicenceUploadDialog")
+
+<script>
+    // "None" (no licence yet): there is no licence PDF to upload, so hide that box
+    (function () {
+        Array.prototype.forEach.call(document.querySelectorAll('select[name=licenceStatus]'), function (sel) {
+            var form = sel.form, file = form && form.querySelector('input[type=file][name=licenceDocument]');
+            if (!file) return;
+            var box = file.closest('.form-group-custom, .pf-doc') || file.parentNode, wasRequired = file.required;
+            function sync() {
+                var none = sel.value === 'None';
+                box.style.display = none ? 'none' : '';
+                file.required = wasRequired && !none;
+                if (none) file.value = '';
+            }
+            sel.addEventListener('change', sync);
+            sync();
+        });
+    })();
+</script>

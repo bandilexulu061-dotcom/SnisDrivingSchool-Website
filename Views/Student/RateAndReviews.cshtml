@@ -1,0 +1,84 @@
+@model SnisDrivingSchool.Models.StudentReviewsViewModel
+@using SnisDrivingSchool.Models
+@{
+    Layout = "~/Views/Student/_StudentLayout.cshtml";
+    ViewBag.Title = "Rate & Review";
+    ViewBag.Active = "Reviews";
+}
+
+<style>
+    .rv-lesson { background: #0d1733; border: 1px solid #2a3a66; border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+    .rv-lesson b { color: var(--text-light); }
+    /* Star picker: five radio buttons shown as stars (right-to-left so hovering lights up the stars before it) */
+    .rv-stars { display: inline-flex; flex-direction: row-reverse; gap: 2px; margin: 10px 0 6px; }
+    .rv-stars input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+    .rv-stars label { font-size: 30px; line-height: 1; color: #3a4870; cursor: pointer; margin: 0; }
+    .rv-stars input:checked ~ label,
+    .rv-stars label:hover, .rv-stars label:hover ~ label { color: #ffd166; }
+    .rv-stars input:focus-visible + label { outline: 2px solid var(--accent-blue-light); border-radius: 4px; }
+    .rv-shown { color: #ffd166; font-size: 18px; letter-spacing: 1px; }
+    .rv-item { padding: 12px 0; border-top: 1px solid #22325a; }
+    .rv-item:first-of-type { border-top: 0; padding-top: 0; }
+    .rv-item p { margin: 6px 0 0; color: var(--text-light); }
+</style>
+
+<div class="st-head">
+    <div>
+        <h2>Rate &amp; review</h2>
+        <p>Rate a lesson after your instructor has marked it as done. Your rating helps the school and other learners.</p>
+    </div>
+</div>
+
+<div class="st-grid-2">
+    <div class="st-card">
+        <h3>Lessons to rate</h3>
+        <p class="st-sub">@(Model.ToRate.Count == 0 ? "Nothing to rate right now." : Model.ToRate.Count + " completed lesson" + (Model.ToRate.Count == 1 ? "" : "s") + " waiting for your rating.")</p>
+
+        @if (Model.ToRate.Count == 0)
+        {
+            <div class="st-empty" style="text-align:left;padding:6px 0;">
+                When your instructor marks a lesson as done, it shows up here so you can rate it.
+            </div>
+        }
+        @foreach (var b in Model.ToRate)
+        {
+            <div class="rv-lesson">
+                <b>@b.PackageName</b>
+                <span class="st-small">@b.BookingDate.ToString("dddd d MMMM yyyy") · @b.TimeText · with @(string.IsNullOrEmpty(b.InstructorName) ? "your instructor" : b.InstructorName)</span>
+                @using (Html.BeginForm("RateAndReviews", "Student", FormMethod.Post))
+                {
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="bookingId" value="@b.BookingId" />
+                    <div class="rv-stars" role="radiogroup" aria-label="Rating">
+                        @for (int star = 5; star >= 1; star--)
+                        {
+                            string id = "r" + b.BookingId + "_" + star;
+                            <input type="radio" name="rating" id="@id" value="@star" required />
+                            <label for="@id" title="@star star@(star == 1 ? "" : "s")">&#9733;</label>
+                        }
+                    </div>
+                    <textarea name="comment" class="st-input" maxlength="@SnisDrivingSchool.Lessons.MaxComment" placeholder="Optional: what went well, what could be better?" style="min-height:70px;"></textarea>
+                    <div class="st-actions" style="margin-top:10px;">
+                        <button type="submit" class="st-btn primary small">Submit rating</button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="st-card">
+        <h3>Your reviews</h3>
+        <p class="st-sub">@(Model.Mine.Count == 0 ? "You haven't rated a lesson yet." : Model.Mine.Count + " review" + (Model.Mine.Count == 1 ? "" : "s"))</p>
+        @foreach (var rv in Model.Mine)
+        {
+            <div class="rv-item">
+                <span class="rv-shown" aria-label="@rv.Rating out of 5">@SnisDrivingSchool.Lessons.Stars(rv.Rating)</span>
+                <span class="st-small">@rv.PackageName with @(string.IsNullOrEmpty(rv.Instructor) ? "your instructor" : rv.Instructor) · lesson on @rv.LessonDate.ToString("d MMM yyyy")</span>
+                @if (!string.IsNullOrEmpty(rv.Comment))
+                {
+                    <p>"@rv.Comment"</p>
+                }
+            </div>
+        }
+    </div>
+</div>

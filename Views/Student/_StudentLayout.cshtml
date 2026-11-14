@@ -1,0 +1,196 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+@* Student area: same navy look as the manager, receptionist and instructor pages.
+   Left: menu. Right: the page. Shared classes (st-...) are defined once here. *@
+
+<style>
+    .st-shell { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 24px; align-items: start; margin-bottom: 30px; }
+    .st-side, .st-main { min-width: 0; }
+
+    /* ---------- side menu ---------- */
+    .st-side { position: sticky; top: 70px; background: var(--navy-mid); border: 1px solid #2a3557; border-radius: 12px; padding: 16px 12px; }
+    .st-user { display: flex; align-items: center; gap: 10px; padding: 4px 6px 14px; border-bottom: 1px solid #2a3557; margin-bottom: 10px; }
+    .st-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--accent-blue); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; flex: none; }
+    .st-user b { display: block; color: var(--text-light); font-size: 14px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+    .st-user span { color: var(--text-muted); font-size: 12px; }
+    .st-nav-label { color: #7d8bb0; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin: 14px 8px 6px; }
+    .st-nav a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; color: var(--text-muted); font-size: 14px; text-decoration: none; }
+    .st-nav a svg { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .st-nav a:hover { background: #1b2a4e; color: var(--text-light); text-decoration: none; }
+    .st-nav a.active { background: var(--accent-blue); color: #fff; }
+
+    /* ---------- page header ---------- */
+    .st-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+    .st-head h2 { margin: 0; font-size: 26px; font-weight: 700; color: var(--text-light); }
+    .st-head p { margin: 4px 0 0; color: var(--text-muted); }
+    .st-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* ---------- cards ---------- */
+    .st-card { background: var(--navy-mid); border: 1px solid #2a3557; border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
+    .st-card h3 { margin: 0 0 4px; font-size: 17px; font-weight: 600; color: var(--text-light); }
+    .st-card .st-sub { margin: 0 0 14px; color: var(--text-muted); font-size: 13px; }
+    .st-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+    .st-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .st-grid-2 > .st-card { margin-bottom: 0; }
+    .st-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .st-stat { background: var(--navy-mid); border: 1px solid #2a3557; border-radius: 12px; padding: 14px 16px; }
+    .st-stat .l { color: var(--text-muted); font-size: 12px; }
+    .st-stat .v { font-size: 26px; font-weight: 700; color: var(--text-light); line-height: 1.25; }
+    .st-stat .d { color: var(--text-muted); font-size: 12px; }
+
+    /* ---------- forms ---------- */
+    .st-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+    .st-field { min-width: 0; }
+    .st-field.full { grid-column: 1 / -1; }
+    .st-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-light); margin: 0 0 5px; }
+    .st-input { display: block; width: 100%; max-width: none; height: 40px; padding: 8px 12px; background: #0d1733; color: var(--text-light);
+                border: 1px solid #2a3a66; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+    textarea.st-input { height: auto; min-height: 90px; }
+    input[type=file].st-input { height: auto; padding: 7px 10px; color: var(--text-muted); }
+    input[type=file].st-input::file-selector-button { background: #1b2a4e; color: #fff; border: 1px solid #2a3a66; border-radius: 6px; padding: 5px 12px; margin-right: 10px; cursor: pointer; }
+    .st-input:focus { outline: none; border-color: var(--accent-blue-light); box-shadow: 0 0 0 3px rgba(77, 141, 255, .2); }
+    .st-input[readonly], .st-input:disabled { background: #111b33; color: #8f9bbb; cursor: default; }
+    select.st-input option { background: #0d1733; color: var(--text-light); }
+    .st-hint { display: block; color: var(--text-muted); font-size: 12px; margin-top: 5px; }
+    .st-error { display: block; color: #ff9c9c; font-size: 12px; margin-top: 4px; }
+
+    /* ---------- buttons ---------- */
+    .st-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px; padding: 0 16px; border-radius: 8px;
+              border: 1px solid #2a3a66; background: transparent; color: var(--text-light); font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; }
+    .st-btn:hover { border-color: var(--accent-blue-light); color: #fff; text-decoration: none; }
+    .st-btn.primary { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+    .st-btn.primary:hover { background: var(--accent-blue-light); border-color: var(--accent-blue-light); }
+    .st-btn.danger { border-color: #7a2a2a; color: #ff9c9c; }
+    .st-btn.danger:hover { background: #4a1b1b; }
+    .st-btn.small { height: 30px; padding: 0 12px; font-size: 13px; }
+    .st-btn[disabled] { opacity: .5; cursor: not-allowed; }
+    .st-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+
+    /* ---------- messages ---------- */
+    .st-alert { padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; border: 1px solid transparent; font-size: 14px; }
+    .st-alert a { color: inherit; font-weight: 700; text-decoration: underline; }
+    .st-alert.ok { background: #12301f; border-color: #1f5a37; color: #c8ffd4; }
+    .st-alert.bad { background: #3a1616; border-color: #6a2525; color: #ffd0d0; }
+    .st-alert.warn { background: #3a2e12; border-color: #6a5420; color: #ffe2a8; }
+    .st-alert.info { background: #132a4a; border-color: #23467a; color: #cfe2ff; }
+
+    /* ---------- tables ---------- */
+    .st-table-wrap { overflow: auto; border: 1px solid #2a3557; border-radius: 10px; }
+    .st-table { width: 100%; border-collapse: collapse; color: var(--text-light); font-size: 14px; background: var(--navy-dark); }
+    .st-table th { background: #1b2a4e; color: #fff; text-align: left; padding: 10px 12px; white-space: nowrap; font-weight: 600; }
+    .st-table td { padding: 10px 12px; border-top: 1px solid #1d2a4a; vertical-align: top; }
+    .st-table tbody tr:hover td { background: #121f3d; }
+    .st-table .num { text-align: right; white-space: nowrap; }
+    .st-table .nowrap { white-space: nowrap; }
+    .st-small { display: block; color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+    .st-empty { padding: 26px; text-align: center; color: var(--text-muted); }
+
+    /* ---------- badges ---------- */
+    .st-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .st-ok { background: #1b4a2b; color: #9cffb0; }
+    .st-warn { background: #4a3a1b; color: #ffd89c; }
+    .st-bad { background: #4a1b1b; color: #ff9c9c; }
+    .st-info { background: #1b3a5a; color: #9cc9ff; }
+    .st-muted { background: #232c45; color: #a9b3cc; }
+
+    /* ---------- key/value lists ---------- */
+    .st-dl { display: grid; grid-template-columns: 140px 1fr; gap: 8px 14px; margin: 0; }
+    .st-dl dt { color: var(--text-muted); font-weight: 400; }
+    .st-dl dd { margin: 0; color: var(--text-light); }
+
+    /* ---------- pop-ups ---------- */
+    dialog.st-dialog { background: var(--navy-mid); color: var(--text-light); border: 1px solid #2a3557; border-radius: 12px; padding: 0; width: 480px; max-width: calc(100vw - 32px); }
+    dialog.st-dialog::backdrop { background: rgba(5, 10, 25, .7); }
+    .st-dialog-head { padding: 16px 20px; border-bottom: 1px solid #2a3557; font-size: 18px; font-weight: 600; }
+    .st-dialog-body { padding: 16px 20px; }
+    .st-dialog-foot { padding: 12px 20px; border-top: 1px solid #2a3557; display: flex; justify-content: flex-end; gap: 10px; }
+
+    @@media (max-width: 991px) {
+        .st-shell { grid-template-columns: minmax(0, 1fr); }
+        .st-side { position: static; padding: 10px; }
+        .st-user, .st-nav-label { display: none; }
+        .st-nav { display: flex; gap: 6px; overflow-x: auto; }
+        .st-nav a { flex: none; }
+        .st-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .st-grid-2, .st-form { grid-template-columns: 1fr; }
+    }
+
+    /* Printing (Booking history / Payment summary): plain black on white, no menu */
+    @@media print {
+        .navbar, .st-side, .st-no-print, footer, hr { display: none !important; }
+        body, .st-card, .st-stat, .st-table, .st-table td { background: #fff !important; color: #000 !important; }
+        .body-content { padding-top: 0 !important; }
+        .st-shell { display: block; }
+        .st-card, .st-stat, .st-table-wrap { border-color: #999 !important; }
+        .st-head h2, .st-card h3, .st-stat .v, .st-dl dd { color: #000 !important; }
+        .st-head p, .st-sub, .st-stat .l, .st-stat .d, .st-small, .st-dl dt { color: #444 !important; }
+        .st-table th { background: #eee !important; color: #000 !important; }
+        .st-table td { border-color: #ccc !important; }
+        .st-badge { border: 1px solid #999; background: #fff !important; color: #000 !important; }
+        .st-table-wrap { overflow: visible !important; }
+    }
+</style>
+
+@{
+    string active = ViewBag.Active as string ?? "";
+    // Before the account is verified and approved, only Home and Profile are in the menu
+    var account = ViewBag.Account as SnisDrivingSchool.StudentApproval.State;
+    bool limited = account != null && !account.CanBook;
+    string userName = Convert.ToString(Session["UserName"]);
+    var parts = userName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+    string initials = SnisDrivingSchool.Models.StudentUi.Initials(parts.Length > 0 ? parts[0] : "", parts.Length > 1 ? parts[1] : "");
+    if (initials == "") { initials = "S"; }
+    var menu = new[]
+    {
+        new { Group = "",         Key = "Home",     Text = "Home",                  Action = "Index",          Icon = "M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" },
+        new { Group = "Lessons",  Key = "Book",     Text = "Book a lesson",         Action = "BookLesson",     Icon = "M12 5v14M5 12h14" },
+        new { Group = "",         Key = "Bookings", Text = "My bookings",           Action = "Bookings",       Icon = "M4 5h16v15H4zM4 10h16M9 3v4M15 3v4" },
+        new { Group = "",         Key = "Payment",  Text = "Payments",              Action = "Payment",        Icon = "M3 6h18v12H3zM3 10h18M7 15h4" },
+        new { Group = "",         Key = "History",  Text = "Booking history",       Action = "BookingHistory", Icon = "M12 7v5l3 2M3 12a9 9 0 1 0 3-6.7M3 4v4h4" },
+        new { Group = "Account",  Key = "Profile",  Text = "Profile & documents",   Action = "Profile",        Icon = "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" },
+        new { Group = "",         Key = "Reviews",  Text = "Rate & review",         Action = "RateAndReviews", Icon = "M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z" }
+    };
+}
+
+<div class="st-shell">
+    <aside class="st-side">
+        <div class="st-user">
+            <div class="st-avatar">@initials</div>
+            <div><b>@userName</b><span>@(limited ? SnisDrivingSchool.StudentApproval.StageText(account.Stage) : "Student")</span></div>
+        </div>
+        <nav class="st-nav" aria-label="Student menu">
+            @foreach (var m in menu)
+            {
+                if (limited && m.Key != "Home" && m.Key != "Profile") { continue; }
+                if (m.Group != "")
+                {
+                    <div class="st-nav-label">@m.Group</div>
+                }
+                <a href="@Url.Action(m.Action, "Student")" class="@(active == m.Key ? "active" : "")">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="@m.Icon" /></svg>@m.Text
+                </a>
+            }
+        </nav>
+    </aside>
+
+    <main class="st-main">
+        @if (TempData["Success"] != null)
+        {
+            <div class="st-alert ok">@TempData["Success"]</div>
+        }
+        @if (TempData["Error"] != null)
+        {
+            <div class="st-alert bad">@TempData["Error"]</div>
+        }
+        @if (ViewBag.Error != null)
+        {
+            <div class="st-alert bad">@ViewBag.Error</div>
+        }
+        @RenderBody()
+    </main>
+</div>
+
+@section scripts {
+    @RenderSection("scripts", required: false)
+}

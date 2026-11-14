@@ -1,0 +1,13 @@
+﻿@{
+    string active = ViewBag.Active as string ?? "";
+}
+
+<fieldset class="wf-group">
+    <legend>Options</legend>
+    @Html.ActionLink("Profile", "Profile", "Student", null, new { @class = "wf-btn wf-block" + (active == "Profile" ? " active" : "") })
+    @Html.ActionLink("Book a Lesson", "BookLesson", "Student", null, new { @class = "wf-btn wf-block" + (active == "Book" ? " active" : "") })
+    @Html.ActionLink("My Bookings", "Bookings", "Student", null, new { @class = "wf-btn wf-block" + (active == "Bookings" ? " active" : "") })
+    @Html.ActionLink("Payment", "Payment", "Student", null, new { @class = "wf-btn wf-block" + (active == "Payment" ? " active" : "") })
+    @Html.ActionLink("Reviews", "RateAndReviews", "Student", null, new { @class = "wf-btn wf-block" + (active == "Reviews" ? " active" : "") })
+    @Html.ActionLink("Dashboard", "Index", "Student", null, new { @class = "wf-btn wf-block" })
+</fieldset>

@@ -1,0 +1,161 @@
+﻿@model SnisDrivingSchool.Models.StudentProfile
+@{
+    Layout = "~/Views/Student/_StudentLayout.cshtml";
+    ViewBag.Title = "My Profile";
+    ViewBag.Active = "Profile";
+    var saId = SnisDrivingSchool.SaIdNumber.Parse(Model.IdNumber);
+    string licence = SnisDrivingSchool.Licence.Normalize(Model.LicenceStatus);
+    string eligCss = saId.DrivingLicence ? "ok" : saId.LearnerLight ? "warn" : "bad";
+}
+
+<style>
+    .pf-doc { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; background: #0d1733; border: 1px solid #2a3a66; border-radius: 10px; padding: 14px 16px; }
+    .pf-doc b { color: var(--text-light); }
+    .pf-doc .st-small { margin-top: 0; }
+    .pf-doc input[type=file] { grid-column: 1 / -1; margin-top: 6px; }
+    .pf-docs { display: grid; gap: 12px; }
+</style>
+
+<div class="st-head">
+    <div>
+        <h2>Profile &amp; documents</h2>
+        <p>Keep your contact details up to date and your ID and licence copies on file.</p>
+    </div>
+</div>
+
+@using (Html.BeginForm("Profile", "Student", FormMethod.Post, new { autocomplete = "off", enctype = "multipart/form-data" }))
+{
+    @Html.AntiForgeryToken()
+
+    <div class="st-grid-2">
+        <div class="st-card">
+            <h3>Personal details</h3>
+            <p class="st-sub">Student number @Model.StudentId · username <b>@Model.UserName</b></p>
+
+            <div class="st-form">
+                <div class="st-field">
+                    <label for="Name">First name</label>
+                    @Html.TextBoxFor(m => m.Name, new { @class = "st-input", @readonly = "readonly" })
+                </div>
+                <div class="st-field">
+                    <label for="Surname">Surname</label>
+                    @Html.TextBoxFor(m => m.Surname, new { @class = "st-input", @readonly = "readonly" })
+                </div>
+                <div class="st-field">
+                    <label for="PhoneNumber">Phone number</label>
+                    @Html.TextBoxFor(m => m.PhoneNumber, new { @class = "st-input", inputmode = "tel" })
+                    @Html.ValidationMessageFor(m => m.PhoneNumber, "", new { @class = "st-error" })
+                </div>
+                <div class="st-field">
+                    <label for="Email">Email</label>
+                    @Html.TextBoxFor(m => m.Email, new { @class = "st-input", type = "email" })
+                    @Html.ValidationMessageFor(m => m.Email, "", new { @class = "st-error" })
+                </div>
+                <div class="st-field full">
+                    <label for="Address">Address</label>
+                    @Html.TextBoxFor(m => m.Address, new { @class = "st-input" })
+                </div>
+                <div class="st-field full">
+                    <label for="NewPassword">New password</label>
+                    @Html.PasswordFor(m => m.NewPassword, new { @class = "st-input", autocomplete = "new-password", placeholder = "Leave blank to keep your current password" })
+                    @Html.ValidationMessageFor(m => m.NewPassword, "", new { @class = "st-error" })
+                </div>
+            </div>
+            <span class="st-hint" style="margin-top:12px;">To change your name, please contact the school.</span>
+        </div>
+
+        <div class="st-card">
+            <h3>ID &amp; licence</h3>
+            <p class="st-sub">The school needs a PDF copy of your ID and of your current licence.</p>
+
+            <div class="st-form">
+                <div class="st-field full">
+                    <label for="IdNumber">South African ID number</label>
+                    @if (saId.IsValid)
+                    {
+                        <input type="text" class="st-input" value="@Model.IdNumber" readonly title="Contact the school to change your ID number" />
+                        @Html.HiddenFor(m => m.IdNumber)
+                        <span class="st-hint">Born @saId.DateOfBirth.ToString("d MMMM yyyy") · @saId.Gender · @saId.Citizenship</span>
+                    }
+                    else
+                    {
+                        @Html.TextBoxFor(m => m.IdNumber, new { @class = "st-input", maxlength = "13", inputmode = "numeric", placeholder = "13-digit SA ID number" })
+                    }
+                </div>
+                <div class="st-field full">
+                    <div class="st-alert @eligCss" style="margin:0;">@saId.EligibilityText</div>
+                </div>
+                <div class="st-field full">
+                    <label for="licenceStatus">Licence you have now</label>
+                    <select name="licenceStatus" id="licenceStatus" class="st-input">
+                        <option value="">Choose</option>
+                        @foreach (var o in SnisDrivingSchool.Licence.StatusOptions)
+                        {
+                            <option value="@o.Key" @(licence == o.Key ? "selected" : "")>@o.Value</option>
+                        }
+                    </select>
+                    <span class="st-hint">@SnisDrivingSchool.Licence.NextStepText(Model.LicenceStatus)</span>
+                </div>
+            </div>
+
+            <div class="pf-docs" style="margin-top:16px;">
+                <div class="pf-doc">
+                    <div>
+                        <b>ID document</b>
+                        <span class="st-small">@(Model.IdDocumentId > 0 ? "On file. Choose a file below only to replace it." : "Not uploaded yet. This is required.")</span>
+                    </div>
+                    @if (Model.IdDocumentId > 0)
+                    {
+                        <a class="st-btn small" target="_blank" href="@Url.Action("Open", "Documents", new { id = Model.IdDocumentId })">View PDF</a>
+                    }
+                    else
+                    {
+                        <span class="st-badge st-bad">Missing</span>
+                    }
+                    <input type="file" name="idDocument" accept="application/pdf,.pdf" class="st-input" @(Model.IdDocumentId > 0 ? "" : "required") />
+                </div>
+
+                <div class="pf-doc">
+                    <div>
+                        <b>Licence</b>
+                        <span class="st-small">@(Model.DocumentId > 0 ? "On file. Upload a new copy if you change your licence above." : "Not uploaded yet. Needed before you can book.")</span>
+                    </div>
+                    @if (Model.DocumentId > 0)
+                    {
+                        <a class="st-btn small" target="_blank" href="@Url.Action("Open", "Documents", new { id = Model.DocumentId })">View PDF</a>
+                    }
+                    else
+                    {
+                        <span class="st-badge st-bad">Missing</span>
+                    }
+                    <input type="file" name="licenceDocument" accept="application/pdf,.pdf" class="st-input" />
+                </div>
+                <span class="st-hint">PDF files only, up to 3 MB each.</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="st-actions">
+        <button type="submit" class="st-btn primary">Save changes</button>
+        <a class="st-btn" href="@Url.Action("Profile", "Student")">Undo changes</a>
+    </div>
+}
+
+<script>
+    // "None" (no licence yet): there is no licence PDF to upload, so hide that box
+    (function () {
+        Array.prototype.forEach.call(document.querySelectorAll('select[name=licenceStatus]'), function (sel) {
+            var form = sel.form, file = form && form.querySelector('input[type=file][name=licenceDocument]');
+            if (!file) return;
+            var box = file.closest('.form-group-custom, .pf-doc') || file.parentNode, wasRequired = file.required;
+            function sync() {
+                var none = sel.value === 'None';
+                box.style.display = none ? 'none' : '';
+                file.required = wasRequired && !none;
+                if (none) file.value = '';
+            }
+            sel.addEventListener('change', sync);
+            sync();
+        });
+    })();
+</script>

@@ -1,0 +1,102 @@
+﻿@{
+    ViewBag.Title = "Register";
+    var form = ViewBag.Form as System.Collections.Generic.Dictionary<string, string> ?? new System.Collections.Generic.Dictionary<string, string>();
+    Func<string, string> f = k => form.ContainsKey(k) ? form[k] : "";
+}
+
+<div class="login-wrapper">
+    <div class="login-card wide">
+        <h2>Create Account</h2>
+        <p class="login-subtext">Register as a student to book lessons</p>
+
+        @if (ViewBag.Error != null)
+        {
+            <div class="login-error">@ViewBag.Error</div>
+        }
+
+        @using (Html.BeginForm("Register", "Account", FormMethod.Post, new { enctype = "multipart/form-data", @class = "form-2col" }))
+        {
+            @Html.AntiForgeryToken()
+            <div class="form-group-custom">
+                <label>First Name</label>
+                <input type="text" name="name" class="form-control-custom" placeholder="First name" maxlength="50" value="@f("name")" required />
+            </div>
+            <div class="form-group-custom">
+                <label>Surname</label>
+                <input type="text" name="surname" class="form-control-custom" placeholder="Surname" maxlength="50" value="@f("surname")" required />
+            </div>
+            <div class="form-group-custom">
+                <label>Username</label>
+                <input type="text" name="username" class="form-control-custom" placeholder="Choose a username" minlength="3" maxlength="50" pattern="[A-Za-z0-9._\-]+" title="Letters, numbers, dots, dashes or underscores, no spaces" value="@f("username")" required />
+            </div>
+            <div class="form-group-custom">
+                <label>Phone Number</label>
+                <input type="tel" name="phone" class="form-control-custom" placeholder="e.g. 0821234567" maxlength="15" value="@f("phone")" required />
+            </div>
+            <div class="form-group-custom">
+                <label>Email</label>
+                <input type="email" name="email" class="form-control-custom" placeholder="you@example.com" maxlength="50" value="@f("email")" required />
+            </div>
+            <div class="form-group-custom">
+                <label>Address</label>
+                <input type="text" name="address" class="form-control-custom" placeholder="Street, City" maxlength="50" value="@f("address")" />
+            </div>
+            <div class="form-group-custom">
+                <label>South African ID number</label>
+                <input type="text" name="idNumber" class="form-control-custom" placeholder="e.g. 8001015009087" maxlength="13"
+                       inputmode="numeric" pattern="[0-9]{13}" title="13 digits" value="@ViewBag.IdNumber" required />
+                <small style="display:block;color:var(--text-muted);margin-top:4px;">13 digits. We use it to check you are old enough for a learner's licence (17) and driving licence (18).</small>
+            </div>
+            <div class="form-group-custom">
+                <label>Which licence do you have?</label>
+                <select name="licenceStatus" class="form-control-custom" required>
+                    <option value="">-- Choose --</option>
+                    @foreach (var o in SnisDrivingSchool.Licence.StatusOptions)
+                    {
+                        <option value="@o.Key" @((ViewBag.LicenceStatus as string) == o.Key ? "selected" : "")>@o.Value</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group-custom">
+                <label>Upload a copy of your ID document (PDF)</label>
+                <input type="file" name="idDocument" accept="application/pdf,.pdf" class="form-control-custom" required />
+                <small style="display:block;color:var(--text-muted);margin-top:4px;">Your green ID book or smart ID card (both sides), scanned as one PDF, up to 3 MB.</small>
+            </div>
+            <div class="form-group-custom">
+                <label>Upload a copy of that licence (PDF)</label>
+                <input type="file" name="licenceDocument" accept="application/pdf,.pdf" class="form-control-custom" required />
+                <small style="display:block;color:var(--text-muted);margin-top:4px;">PDF only, up to 3 MB. Lessons are booked for the next code: learner's &rarr; Code 8, Code 8 &rarr; Code 10, Code 10 &rarr; Code 14.</small>
+            </div>
+            <div class="form-group-custom">
+                <label>Password</label>
+                <input type="password" name="password" class="form-control-custom" placeholder="6+ characters, a letter and a number" minlength="6" maxlength="50" required />
+            </div>
+            <div class="form-group-custom">
+                <label>Confirm Password</label>
+                <input type="password" name="confirmPassword" class="form-control-custom" placeholder="Repeat password" required />
+            </div>
+            <button type="submit" class="btn-accent btn-block-custom">Register</button>
+        }
+
+        <p class="login-footer">Already have an account? @Html.ActionLink("Log in", "Login", "Account")</p>
+    </div>
+</div>
+
+<script>
+    // "None" (no licence yet): there is no licence PDF to upload, so hide that box
+    (function () {
+        Array.prototype.forEach.call(document.querySelectorAll('select[name=licenceStatus]'), function (sel) {
+            var form = sel.form, file = form && form.querySelector('input[type=file][name=licenceDocument]');
+            if (!file) return;
+            var box = file.closest('.form-group-custom, .pf-doc') || file.parentNode, wasRequired = file.required;
+            function sync() {
+                var none = sel.value === 'None';
+                box.style.display = none ? 'none' : '';
+                file.required = wasRequired && !none;
+                if (none) file.value = '';
+            }
+            sel.addEventListener('change', sync);
+            sync();
+        });
+    })();
+</script>

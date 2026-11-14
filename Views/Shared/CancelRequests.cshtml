@@ -1,0 +1,276 @@
+﻿@model List<SnisDrivingSchool.CancelRequestRow>
+@{
+    ViewBag.Title = "Cancellation requests";
+    string ctl = Convert.ToString(ViewBag.Ctl);
+}
+
+<style>
+    .cr-wrap {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 8px 0 30px;
+        color: #e8eefc;
+    }
+
+    .cr-back {
+        display: inline-block;
+        margin-bottom: 18px;
+        padding: 8px 14px;
+        border: 1px solid #3b82f6;
+        border-radius: 8px;
+        color: #9cc9ff;
+        text-decoration: none;
+        font-size: 14px;
+    }
+
+    .cr-wrap h2 {
+        margin: 0 0 6px;
+        font-size: 30px;
+        color: #fff;
+    }
+
+    .cr-sub {
+        color: #9fb3d9;
+        margin: 0 0 20px;
+    }
+
+    .cr-msg {
+        padding: 12px 16px;
+        border-radius: 10px;
+        margin-bottom: 16px;
+        font-size: 14px;
+    }
+
+    .cr-ok {
+        background: #14532d;
+        border: 1px solid #22c55e;
+        color: #bbf7d0;
+    }
+
+    .cr-bad {
+        background: #4c1d1d;
+        border: 1px solid #ef4444;
+        color: #fecaca;
+    }
+
+    .cr-empty {
+        padding: 26px;
+        text-align: center;
+        background: #131f3d;
+        border: 1px solid #22325a;
+        border-radius: 12px;
+        color: #9fb3d9;
+    }
+
+    .cr-card {
+        background: #131f3d;
+        border: 1px solid #22325a;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 16px;
+    }
+
+    .cr-top {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        justify-content: space-between;
+        align-items: baseline;
+    }
+
+        .cr-top h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #fff;
+        }
+
+    .cr-pill {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        background: #3a2d0b;
+        color: #fcd34d;
+        border: 1px solid #8a6d1a;
+    }
+
+        .cr-pill.paid {
+            background: #14532d;
+            color: #bbf7d0;
+            border-color: #22c55e;
+        }
+
+    .cr-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 10px 20px;
+        margin: 14px 0;
+    }
+
+        .cr-grid b {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #9fb3d9;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+    .cr-reason {
+        background: #0d1733;
+        border: 1px solid #2a3a66;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+    }
+
+        .cr-reason b {
+            display: block;
+            font-size: 12px;
+            color: #9fb3d9;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            margin-bottom: 4px;
+        }
+
+    .cr-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+
+        .cr-actions form {
+            margin: 0;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+    .cr-btn {
+        padding: 9px 16px;
+        border-radius: 8px;
+        border: 1px solid #2a3a66;
+        background: #0d1733;
+        color: #e8eefc;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+        .cr-btn.go {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .cr-btn.no {
+            border-color: #ef4444;
+            color: #fecaca;
+        }
+
+        .cr-btn.small {
+            font-size: 13px;
+            padding: 8px 12px;
+            color: #9fb3d9;
+        }
+
+    .cr-note {
+        padding: 9px 12px;
+        border-radius: 8px;
+        border: 1px solid #2a3a66;
+        background: #0d1733;
+        color: #e8eefc;
+        min-width: 230px;
+        font-size: 14px;
+    }
+
+    .cr-hint {
+        color: #9fb3d9;
+        font-size: 12px;
+        margin-top: 10px;
+    }
+</style>
+
+<div class="cr-wrap">
+    <a class="cr-back" href="@Url.Action("Index", ctl)">&larr; Back to dashboard</a>
+    <h2>Cancellation requests</h2>
+    <p class="cr-sub">
+        Instructors ask to cancel a lesson here. If you <b>accept</b>, the system gives the lesson to another approved instructor
+        who is not on leave and is free at that time. If you <b>decline</b>, the lesson stays with the same instructor.
+    </p>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="cr-msg cr-ok">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="cr-msg cr-bad">@TempData["Error"]</div>
+    }
+    @if (ViewBag.Error != null)
+    {
+        <div class="cr-msg cr-bad">@ViewBag.Error</div>
+    }
+
+    @if (Model == null || Model.Count == 0)
+    {
+        <div class="cr-empty">No cancellation requests are waiting for an answer.</div>
+    }
+    else
+    {
+        foreach (var q in Model)
+        {
+            <div class="cr-card">
+                <div class="cr-top">
+                    <h3>Lesson #@q.BookingId &middot; @q.DateText@(string.IsNullOrEmpty(q.Time) ? "" : " at " + q.Time)</h3>
+                    <span>
+                        <span class="cr-pill">Waiting for an answer</span>
+                        @if (q.Paid)
+                        {
+                            <span class="cr-pill paid">Student has paid</span>
+                        }
+                    </span>
+                </div>
+
+                <div class="cr-grid">
+                    <div><b>Student</b>@q.Student</div>
+                    <div><b>Package</b>@q.Package</div>
+                    <div><b>Instructor asking to cancel</b>@q.Instructor</div>
+                    <div><b>Requested on</b>@q.RequestedOn.ToString("d MMM yyyy HH:mm")</div>
+                </div>
+
+                <div class="cr-reason">
+                    <b>Reason given by the instructor</b>
+                    @q.Reason
+                </div>
+
+                <div class="cr-actions">
+                    @using (Html.BeginForm("AcceptCancel", ctl, FormMethod.Post))
+                    {
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@q.BookingId" />
+                        <button type="submit" class="cr-btn go">Accept and assign another instructor</button>
+                    }
+
+                    @using (Html.BeginForm("DeclineCancel", ctl, FormMethod.Post))
+                    {
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@q.BookingId" />
+                        <input type="text" name="note" class="cr-note" placeholder="Reason for declining" minlength="5" maxlength="300" required />
+                        <button type="submit" class="cr-btn no">Decline</button>
+                    }
+
+                    @using (Html.BeginForm("CancelLesson", ctl, FormMethod.Post, new { onsubmit = "return confirm('Cancel this lesson instead of giving it to another instructor? A paid lesson is refunded to the student.');" }))
+                    {
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@q.BookingId" />
+                        <button type="submit" class="cr-btn small">Cancel the lesson instead</button>
+                    }
+                </div>
+                <div class="cr-hint">If nobody else is free, Accept shows a message and the request stays open. Then you can decline it or cancel the lesson.</div>
+            </div>
+        }
+    }
+</div>

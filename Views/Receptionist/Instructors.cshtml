@@ -1,0 +1,79 @@
+﻿@model IEnumerable<SnisDrivingSchool.Models.InstructorRow>
+@{
+    ViewBag.Title = "Receptionist - Instructors";
+    ViewBag.Active = "Instructors";
+}
+<div class="manager-header">
+    <h2>Receptionist dashboard</h2>
+    <p>Manage driving instructors and their schedules.</p>
+</div>
+
+
+
+@Html.Partial("_ReceptionistNav")
+
+<div class="manager-panel">
+    <div class="manager-panel-header">
+        <h3>Instructors</h3>
+    </div>
+    <div class="search-bar">
+        <input type="text" id="tableSearch" class="form-control-custom" placeholder="Search instructors by name, email, or licence code" />
+    </div>
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger">@ViewBag.Error</div>
+    }
+
+    <div class="table-responsive">
+        <table class="table table-hover" id="instructorsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Licence code</th>
+                    <th>Experience (yrs)</th>
+                    <th>Username</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var x in Model)
+                {
+                    <tr>
+                        <td>@x.InstructorID</td>
+                        <td>@x.Name @x.Surname</td>
+                        <td>@x.PhoneNo</td>
+                        <td>@x.Email</td>
+                        <td>@x.LicenseCode</td>
+                        <td>@x.YearsOfExperience</td>
+                        <td>@x.UserName</td>
+                        <td>@x.Status</td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="8" class="text-center">No instructors found.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section scripts {
+    <script>
+        // Rendered in <head>, so wait until the page has finished loading.
+        document.addEventListener("DOMContentLoaded", function () {
+            var search = document.getElementById("tableSearch");
+            if (!search) return;
+            search.addEventListener("keyup", function () {
+                var q = this.value.toLowerCase();
+                document.querySelectorAll("#instructorsTable tbody tr").forEach(function (row) {
+                    row.style.display = row.textContent.toLowerCase().indexOf(q) > -1 ? "" : "none";
+                });
+            });
+        });
+    </script>
+}

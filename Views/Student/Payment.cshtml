@@ -1,0 +1,267 @@
+﻿@model SnisDrivingSchool.Models.PaymentViewModel
+@using SnisDrivingSchool.Models
+@{
+    Layout = "~/Views/Student/_StudentLayout.cshtml";
+    ViewBag.Title = "Payment";
+    ViewBag.Active = "Payment";
+    var b = Model.Booking;
+    bool past = b.BookingDate.Date < DateTime.Today;
+    bool locked = b.Paid || b.IsCancelled || b.IsCompleted || past;
+}
+
+<style>
+    .sp-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 18px; align-items: start; }
+    .sp-amount { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid #2a3557; margin-top: 14px; padding-top: 12px; }
+    .sp-amount b { font-size: 24px; color: #fff; }
+    .sp-ref { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #0d1733; border: 1px dashed #3a4f86; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; }
+    .sp-ref b { font-size: 18px; letter-spacing: .04em; color: #fff; }
+    .sp-ref span { display: block; color: var(--text-muted); font-size: 12px; }
+    .sp-steps { margin: 0 0 16px; padding-left: 20px; color: var(--text-muted); }
+    .sp-steps li { margin: 4px 0; }
+    .sp-steps b { color: var(--text-light); }
+    .sp-state { text-align: center; padding: 26px 10px; }
+    .sp-state .icon { font-size: 34px; line-height: 1; margin-bottom: 8px; }
+    .sp-state h4 { margin: 0 0 6px; color: #fff; font-size: 18px; }
+    .sp-state p { margin: 0 auto; color: var(--text-muted); max-width: 420px; }
+    .sp-tabs { display: flex; gap: 8px; margin: 0 0 16px; flex-wrap: wrap; }
+    .sp-tabs button { flex: 1; min-width: 150px; background: #0d1733; border: 1px solid #2a3a66; color: var(--text-muted); border-radius: 10px; padding: 12px; font-weight: 600; cursor: pointer; }
+    .sp-tabs button.on { border-color: var(--accent-blue-light); color: #fff; background: #132a55; }
+    @@media (max-width: 991px) { .sp-layout { grid-template-columns: 1fr; } }
+</style>
+
+<div class="st-head">
+    <div>
+        <h2>Payment</h2>
+        <p>Booking #@b.BookingId · pay by card or EFT.</p>
+    </div>
+    <div class="st-head-actions">
+        <a class="st-btn" href="@Url.Action("Bookings", "Student")">&larr; My bookings</a>
+        @if (b.Paid)
+        {
+            <a class="st-btn" href="@Url.Action("SummaryReport", "Student")" target="_blank">Payment summary (Power BI)</a>
+        }
+    </div>
+</div>
+
+<div class="sp-layout">
+    <div class="st-card" style="margin-bottom:0;">
+        <h3>Booking</h3>
+        <p class="st-sub">@Model.StudentName</p>
+        <dl class="st-dl" style="grid-template-columns:95px 1fr;">
+            <dt>Package</dt><dd>@b.PackageName</dd>
+            <dt>Instructor</dt><dd>@(string.IsNullOrEmpty(b.InstructorName) ? "-" : b.InstructorName)</dd>
+            <dt>@(b.LessonCount > 1 ? "Dates" : "Date")</dt><dd>@(b.LessonCount > 1 ? b.DateRange + " (" + b.LessonCount + " lessons, no Sundays)" : b.BookingDate.ToString("dddd d MMMM yyyy"))</dd>
+            <dt>Time</dt><dd>@b.TimeText</dd>
+            <dt>Status</dt><dd><span class="st-badge @StudentUi.StatusCss(b)">@b.DisplayStatus</span></dd>
+        </dl>
+        <div class="sp-amount"><span style="color:var(--text-muted)">Amount</span><b>@Fmt.Rand(b.Price)</b></div>
+    </div>
+
+    <div class="st-card" style="margin-bottom:0;">
+        @if (b.Refunded)
+        {
+            <div class="sp-state">
+                <div class="icon">&#8634;</div>
+                <h4>Refunded</h4>
+                <p>This booking was cancelled@(b.CancelledOn.HasValue ? " on " + b.CancelledOn.Value.ToString("d MMMM yyyy") : "") and @Fmt.Rand(b.RefundAmount) was refunded to you.</p>
+            </div>
+        }
+        else if (b.IsCancelled)
+        {
+            <div class="sp-state">
+                <div class="icon">&#10005;</div>
+                <h4>Cancelled</h4>
+                <p>This booking was cancelled, so nothing needs to be paid.</p>
+            </div>
+        }
+        else if (b.Paid)
+        {
+            <div class="sp-state">
+                <div class="icon" style="color:#9cffb0;">&#10003;</div>
+                <h4>Paid</h4>
+                <p>Paid by @b.PaymentMethod@(b.PaidOn.HasValue ? " on " + b.PaidOn.Value.ToString("d MMMM yyyy") : ""). Your lesson is booked.</p>
+            </div>
+        }
+        else if (b.IsCompleted)
+        {
+            <div class="sp-state">
+                <h4>Lesson completed</h4>
+                <p>There is nothing to pay on this booking.</p>
+            </div>
+        }
+        else if (past)
+        {
+            <div class="sp-state">
+                <h4>Lesson date has passed</h4>
+                <p>This lesson was not paid before its date, so it can't be paid any more. Please book a new lesson.</p>
+            </div>
+        }
+
+        @if (!locked)
+        {
+            bool card = Model.Method == "Card";
+            <h3>Pay for this lesson</h3>
+            <p class="st-sub">Choose how you want to pay. Your payment is approved straight away and your lesson is booked.</p>
+
+            using (Html.BeginForm("Payment", "Student", new { id = b.BookingId }, FormMethod.Post, new { id = "payForm", autocomplete = "off" }))
+            {
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="method" id="payMethod" value="@(card ? "Card" : "EFT")" />
+
+                <div class="sp-tabs" role="tablist">
+                    <button type="button" class="@(card ? "on" : "")" data-method="Card">&#128179; Card</button>
+                    <button type="button" class="@(card ? "" : "on")" data-method="EFT">&#127974; EFT / bank account</button>
+                </div>
+
+                <div class="st-form" id="cardFields" style="@(card ? "" : "display:none")">
+                    <div class="st-field full">
+                        <label for="cardName">Name on card</label>
+                        <input type="text" class="st-input" id="cardName" name="cardName" maxlength="100" value="@Model.CardName" placeholder="As printed on the card" autocomplete="cc-name" />
+                    </div>
+                    <div class="st-field full">
+                        <label for="cardNumber">Card number</label>
+                        <input type="text" class="st-input" id="cardNumber" name="cardNumber" inputmode="numeric" maxlength="19" placeholder="1234 5678 9012 3456" autocomplete="cc-number" />
+                    </div>
+                    <div class="st-field">
+                        <label for="cardExpiry">Expiry date</label>
+                        <input type="text" class="st-input" id="cardExpiry" name="cardExpiry" inputmode="numeric" maxlength="5" placeholder="MM/YY" autocomplete="cc-exp" />
+                    </div>
+                    <div class="st-field">
+                        <label for="cardCvc">CVC</label>
+                        <input type="password" class="st-input" id="cardCvc" name="cardCvc" inputmode="numeric" maxlength="3" placeholder="3 digits" autocomplete="cc-csc" />
+                        <span class="st-hint">The 3 digits on the back of the card.</span>
+                    </div>
+                </div>
+
+                <div id="eftFields" style="@(card ? "display:none" : "")">
+                    <div class="sp-ref">
+                        <div><span>Your payment reference</span><b id="payRef">@Model.Reference</b></div>
+                        <button type="button" class="st-btn small" id="copyRef">Copy</button>
+                    </div>
+                    <div class="st-form">
+                        <div class="st-field">
+                            <label for="bank">Bank</label>
+                            <select class="st-input" id="bank" name="bank">
+                                <option value="">Choose your bank</option>
+                                @foreach (var bk in SaBanks.All)
+                                {
+                                    <option value="@bk.Name" data-branch="@bk.BranchCode" data-min="@bk.MinDigits" data-max="@bk.MaxDigits" data-rule="@bk.Rule"
+                                            @(bk.Name == Model.SelectedBank ? "selected" : "")>@bk.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="st-field">
+                            <label for="branchCode">Branch code</label>
+                            <input type="text" class="st-input" id="branchCode" readonly placeholder="Filled in from the bank" />
+                        </div>
+                        <div class="st-field">
+                            <label for="accountName">Account holder</label>
+                            <input type="text" class="st-input" id="accountName" name="accountName" maxlength="100" value="@Model.AccountName" placeholder="Name on the account" />
+                        </div>
+                        <div class="st-field">
+                            <label for="accountNumber">Account number</label>
+                            <input type="text" class="st-input" id="accountNumber" name="accountNumber" maxlength="11" inputmode="numeric" value="@Model.AccountNumber" />
+                            <span class="st-hint" id="acctHint">Choose a bank first.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="st-actions">
+                    <button type="submit" class="st-btn primary" id="payBtn">Pay @Fmt.Rand(b.Price)</button>
+                </div>
+                <span class="st-hint" style="margin-top:8px;">&#128274; This is a demo payment for a school project. No real money is taken and card numbers are not saved.</span>
+            }
+        }
+    </div>
+</div>
+
+@if (!locked)
+{
+    <script>
+        (function () {
+            var form = document.getElementById('payForm');
+            var methodBox = document.getElementById('payMethod');
+            var cardFields = document.getElementById('cardFields'), eftFields = document.getElementById('eftFields');
+            Array.prototype.forEach.call(document.querySelectorAll('.sp-tabs button'), function (tab) {
+                tab.addEventListener('click', function () {
+                    Array.prototype.forEach.call(document.querySelectorAll('.sp-tabs button'), function (t) { t.classList.remove('on'); });
+                    tab.classList.add('on');
+                    methodBox.value = tab.getAttribute('data-method');
+                    var card = methodBox.value === 'Card';
+                    cardFields.style.display = card ? '' : 'none';
+                    eftFields.style.display = card ? 'none' : '';
+                });
+            });
+
+            // ---- card ----
+            var num = document.getElementById('cardNumber'), exp = document.getElementById('cardExpiry'), cvc = document.getElementById('cardCvc');
+            num.addEventListener('input', function () {
+                var d = num.value.replace(/\D/g, '').slice(0, 16);
+                num.value = d.replace(/(\d{4})(?=\d)/g, '$1 ');
+            });
+            exp.addEventListener('input', function () {
+                var d = exp.value.replace(/\D/g, '').slice(0, 4);
+                exp.value = d.length > 2 ? d.slice(0, 2) + '/' + d.slice(2) : d;
+            });
+            cvc.addEventListener('input', function () { cvc.value = cvc.value.replace(/\D/g, '').slice(0, 3); });
+            function luhn(d) {
+                var sum = 0, dbl = false;
+                for (var i = d.length - 1; i >= 0; i--) { var n = +d[i]; if (dbl) { n *= 2; if (n > 9) n -= 9; } sum += n; dbl = !dbl; }
+                return sum % 10 === 0;
+            }
+
+            // ---- EFT ----
+            var bank = document.getElementById('bank');
+            var acct = document.getElementById('accountNumber');
+            var name = document.getElementById('accountName');
+            var branch = document.getElementById('branchCode');
+            var hint = document.getElementById('acctHint');
+            function chosen() { return bank.options[bank.selectedIndex]; }
+            function sync() {
+                var o = chosen();
+                if (o && o.value) {
+                    branch.value = o.getAttribute('data-branch');
+                    hint.textContent = o.value + ' account numbers have ' + o.getAttribute('data-rule') + '.';
+                    acct.maxLength = parseInt(o.getAttribute('data-max'), 10);
+                } else {
+                    branch.value = '';
+                    hint.textContent = 'Choose a bank first.';
+                    acct.maxLength = 11;
+                }
+            }
+            bank.addEventListener('change', sync);
+            sync();
+            acct.addEventListener('input', function () { acct.value = acct.value.replace(/\D/g, ''); });
+
+            document.getElementById('copyRef').addEventListener('click', function () {
+                var text = document.getElementById('payRef').textContent, btn = this;
+                if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { btn.textContent = 'Copied'; });
+            });
+
+            // Quick checks in the browser (the server checks everything again)
+            form.addEventListener('submit', function (e) {
+                var msg = null;
+                if (methodBox.value === 'Card') {
+                    var d = num.value.replace(/\D/g, ''), m = /^(\d{2})\/(\d{2})$/.exec(exp.value);
+                    if (document.getElementById('cardName').value.trim().length < 2) msg = 'Please enter the name on the card.';
+                    else if (d.length !== 16) msg = 'The card number must have 16 digits.';
+                    else if (!luhn(d)) msg = 'The card number is not valid. Check it and try again.';
+                    else if (!m || +m[1] < 1 || +m[1] > 12) msg = 'Enter the expiry date as MM/YY, e.g. 08/28.';
+                    else if (new Date(2000 + +m[2], +m[1], 0) < new Date(new Date().toDateString())) msg = 'This card has expired.';
+                    else if (!/^\d{3}$/.test(cvc.value)) msg = 'The CVC is the 3 digits on the back of the card.';
+                } else {
+                    var o = chosen();
+                    if (!o || !o.value) msg = 'Please choose your bank.';
+                    else if (!name.value.trim()) msg = 'Please enter the account holder name.';
+                    else {
+                        var len = acct.value.length, mn = parseInt(o.getAttribute('data-min'), 10), mx = parseInt(o.getAttribute('data-max'), 10);
+                        if (len < mn || len > mx) msg = o.value + ' account numbers must be ' + o.getAttribute('data-rule') + '.';
+                    }
+                }
+                if (msg) { e.preventDefault(); alert(msg); return; }
+                document.getElementById('payBtn').disabled = true;
+                document.getElementById('payBtn').textContent = 'Processing...';
+            });
+        })();
+    </script>
+}

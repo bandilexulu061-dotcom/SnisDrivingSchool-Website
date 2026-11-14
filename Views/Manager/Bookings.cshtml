@@ -1,0 +1,85 @@
+﻿@model List<SnisDrivingSchool.Models.MgrBookingRow>
+@using SnisDrivingSchool.Models
+@{
+    ViewBag.Title = "Manager - Bookings";
+    ViewBag.Active = "Bookings";
+}
+@Html.Partial("_ManagerNav")
+
+<div class="manager-header">
+    <h2>Bookings</h2>
+    <p>View all bookings made by students and staff.</p>
+</div>
+
+
+<div class="manager-panel">
+    <div class="manager-panel-header">
+        <h3>All bookings (<span id="rowCount">@Model.Count</span>)</h3>
+        <button type="button" class="btn-accent" data-open-booking>+ New booking</button>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="contact-success-message">@TempData["Success"]</div>
+    }
+    @if (ViewBag.Error != null)
+    {
+        <div class="login-error">@ViewBag.Error</div>
+    }
+
+    <div class="search-bar">
+        <input type="text" class="form-control-custom" data-table-search="bookingsTable"
+               placeholder="Search bookings by student, instructor, package, date or status" />
+    </div>
+
+    <div class="m-table-wrap">
+        <table class="m-table" id="bookingsTable">
+            <thead>
+                <tr>
+                    <th>Booking ID</th>
+                    <th>Student</th>
+                    <th>Package</th>
+                    <th>Instructor</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Booking status</th>
+                    <th>Payment</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="8">No bookings found.</td></tr>
+                }
+                @foreach (var b in Model)
+                {
+                    <tr data-row="1">
+                        <td>@b.BookingId</td>
+                        <td>@b.Student</td>
+                        <td>@b.Package</td>
+                        <td>@b.Instructor</td>
+                        <td>@b.Date.ToString("yyyy/MM/dd")</td>
+                        <td>@b.Time</td>
+                        <td>
+                            <span class="m-badge @MgrUi.Badge(b.Status)">@b.Status</span>
+                            @if (!string.IsNullOrEmpty(b.CancelReason))
+                            {
+                                <div class="m-hint" style="max-width:240px;white-space:normal;">"@b.CancelReason"</div>
+                            }
+                            @if (!string.IsNullOrEmpty(b.ProposedName))
+                            {
+                                <div class="m-hint" style="max-width:240px;white-space:normal;color:#ffd89c;">New instructor proposed: @b.ProposedName (waiting for the student)</div>
+                            }
+                        </td>
+                        <td><span class="m-badge @MgrUi.Badge(b.Payment)">@b.Payment</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (ViewBag.BookingForm != null)
+{
+    @Html.Partial("_StaffBookingDialog", (SnisDrivingSchool.StaffBookingFormVm)ViewBag.BookingForm)
+}

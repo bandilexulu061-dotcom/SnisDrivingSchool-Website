@@ -1,0 +1,193 @@
+﻿@model SnisDrivingSchool.Models.MyBookingsViewModel
+@using SnisDrivingSchool.Models
+@{
+    Layout = "~/Views/Student/_StudentLayout.cshtml";
+    ViewBag.Title = "My Bookings";
+    ViewBag.Active = "Bookings";
+    var all = Model.Bookings;
+    int nUpcoming = all.Count(b => StudentUi.Group(b).Contains("upcoming"));
+    int nToPay = all.Count(b => StudentUi.Group(b).Contains("topay"));
+    int nPast = all.Count(b => StudentUi.Group(b) == "past");
+}
+
+<style>
+    .sb-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .sb-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .sb-tabs button { background: transparent; border: 1px solid #2a3a66; color: var(--text-muted); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .sb-tabs button.on { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+    .sb-tabs .n { opacity: .75; margin-left: 4px; }
+    .sb-search { display: flex; gap: 8px; }
+    .sb-search .st-input { width: 240px; height: 36px; }
+    .sb-reason { color: var(--text-muted); font-size: 12px; margin-top: 4px; max-width: 200px; white-space: normal; }
+    .sb-row-actions { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+    #bookingTable td:nth-child(2) { min-width: 170px; }
+</style>
+
+<div class="st-head">
+    <div>
+        <h2>My bookings</h2>
+        <p>Pay for a lesson, check its status or cancel it.</p>
+    </div>
+    <div class="st-head-actions">
+        <a class="st-btn" href="@Url.Action("BookingHistory", "Student", new { print = "1" })" target="_blank">Print history</a>
+        <a class="st-btn primary" href="@Url.Action("BookLesson", "Student")">+ Book a lesson</a>
+    </div>
+</div>
+
+@foreach (var b in all.Where(x => x.NeedsAnswer))
+{
+    <div class="st-alert warn" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div>
+            <b>New instructor for booking #@b.BookingId (@b.PackageName, @b.BookingDate.ToString("ddd d MMM") at @b.TimeText)</b><br />
+            @b.ReplaceReason The system found another free instructor at the same time: <b>@b.ProposedInstructor</b>. Do you accept?
+            <span style="display:block;font-size:12px;opacity:.85;margin-top:3px;">If you decline, the lesson is cancelled@(b.Paid ? " and your payment is refunded" : "").</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+            @using (Html.BeginForm("AcceptInstructor", "Student", new { id = b.BookingId }, FormMethod.Post))
+            {
+                @Html.AntiForgeryToken()
+                <button type="submit" class="st-btn primary small">Accept @b.ProposedInstructor</button>
+            }
+            @using (Html.BeginForm("DeclineInstructor", "Student", new { id = b.BookingId }, FormMethod.Post, new { onsubmit = "return confirm('Decline the new instructor? The lesson will be cancelled.');" }))
+            {
+                @Html.AntiForgeryToken()
+                <button type="submit" class="st-btn small danger">Decline</button>
+            }
+        </div>
+    </div>
+}
+
+<div class="st-card">
+    <div class="sb-bar">
+        <div class="sb-tabs" role="tablist">
+            <button type="button" class="on" data-filter="all">All<span class="n">@all.Count</span></button>
+            <button type="button" data-filter="upcoming">Upcoming<span class="n">@nUpcoming</span></button>
+            <button type="button" data-filter="topay">To pay<span class="n">@nToPay</span></button>
+            <button type="button" data-filter="past">Past &amp; cancelled<span class="n">@nPast</span></button>
+        </div>
+        @using (Html.BeginForm("Bookings", "Student", FormMethod.Get, new { autocomplete = "off", @class = "sb-search" }))
+        {
+            <input type="text" name="search" value="@Model.Search" class="st-input" placeholder="Search by package, e.g. Code 8" />
+            <button type="submit" class="st-btn">Search</button>
+            if (!string.IsNullOrEmpty(Model.Search))
+            {
+                <a class="st-btn" href="@Url.Action("Bookings", "Student")">Clear</a>
+            }
+        }
+    </div>
+
+    <div class="st-table-wrap">
+        <table class="st-table" id="bookingTable">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Lesson</th>
+                    <th>Date &amp; time</th>
+                    <th>Status</th>
+                    <th>Payment</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var b in all)
+                {
+                    <tr data-group="@StudentUi.Group(b)">
+                        <td>@b.BookingId</td>
+                        <td>@b.PackageName<span class="st-small">@(string.IsNullOrEmpty(b.InstructorName) ? "No instructor yet" : "with " + b.InstructorName)</span></td>
+                        <td class="nowrap">@b.DateRange<span class="st-small">@b.TimeText@(b.LessonCount > 1 ? " · " + b.LessonCount + " lessons" : "")</span></td>
+                        <td>
+                            <span class="st-badge @StudentUi.StatusCss(b)">@b.DisplayStatus</span>
+                            @if (b.IsCancelled && !string.IsNullOrEmpty(b.CancelReason))
+                            {
+                                <div class="sb-reason">"@b.CancelReason"@(b.CancelledOn.HasValue ? " · " + b.CancelledOn.Value.ToString("d MMM yyyy") : "")</div>
+                            }
+                        </td>
+                        <td>
+                            <span class="st-badge @StudentUi.PayCss(b)">@StudentUi.PayText(b)</span>
+                            <span class="st-small">@(b.Refunded ? Fmt.Rand(b.RefundAmount) + " back to you" : Fmt.Rand(b.Price) + (b.Paid ? " · " + b.PaymentMethod : ""))</span>
+                        </td>
+                        <td>
+                            <div class="sb-row-actions">
+                                @if (!b.Paid && !b.IsCancelled && !b.AwaitingConfirmation && !b.IsCompleted)
+                                {
+                                    <a class="st-btn small primary" href="@Url.Action("Payment", "Student", new { id = b.BookingId })">Pay</a>
+                                }
+                                else if (!b.IsCancelled)
+                                {
+                                    <a class="st-btn small" href="@Url.Action("Payment", "Student", new { id = b.BookingId })">Details</a>
+                                }
+                                @if (b.CanCancel)
+                                {
+                                    <button type="button" class="st-btn small danger" onclick="openCancel(this)"
+                                            data-id="@b.BookingId" data-what="@b.PackageName, @b.BookingDate.ToString("dddd d MMMM yyyy") at @b.TimeText"
+                                            data-refund="@(b.Paid ? "You paid " + Fmt.Rand(b.PaidAmount ?? 0m) + ". It will be refunded to you." : b.AwaitingConfirmation ? "Your EFT of " + Fmt.Rand(b.Price) + " will be refunded to you." : "")">Cancel</button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                <tr id="noRows" style="@(all.Count == 0 ? "" : "display:none")">
+                    <td colspan="6" class="st-empty">
+                        @(string.IsNullOrEmpty(Model.Search) ? "No bookings here yet." : "No bookings match \"" + Model.Search + "\".")
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Cancel pop-up: a reason is required -->
+<dialog class="st-dialog" id="cancelDialog">
+    @using (Html.BeginForm("CancelBooking", "Student", FormMethod.Post))
+    {
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" id="cancelId" />
+        <div class="st-dialog-head">Cancel this booking?</div>
+        <div class="st-dialog-body">
+            <p id="cancelWhat" style="margin-top:0;font-weight:600;"></p>
+            <div class="st-alert ok" id="cancelRefund" style="display:none;"></div>
+            <div class="st-field">
+                <label for="cancelReason">Why are you cancelling?</label>
+                <textarea id="cancelReason" name="reason" class="st-input" required
+                          minlength="@SnisDrivingSchool.Cancellation.MinReason" maxlength="@SnisDrivingSchool.Cancellation.MaxReason"
+                          placeholder="e.g. I have an exam on that day."></textarea>
+                <span class="st-hint">At least @SnisDrivingSchool.Cancellation.MinReason characters. Your instructor will see this. Cancelling can't be undone.</span>
+            </div>
+        </div>
+        <div class="st-dialog-foot">
+            <button type="button" class="st-btn" onclick="document.getElementById('cancelDialog').close()">Keep booking</button>
+            <button type="submit" class="st-btn danger">Cancel booking</button>
+        </div>
+    }
+</dialog>
+
+<script>
+    function openCancel(btn) {
+        document.getElementById('cancelId').value = btn.getAttribute('data-id');
+        document.getElementById('cancelWhat').textContent = btn.getAttribute('data-what');
+        var refund = btn.getAttribute('data-refund'), box = document.getElementById('cancelRefund');
+        box.textContent = refund;
+        box.style.display = refund ? '' : 'none';
+        document.getElementById('cancelReason').value = '';
+        document.getElementById('cancelDialog').showModal();
+    }
+
+    (function () {
+        var tabs = document.querySelectorAll('.sb-tabs button');
+        var rows = document.querySelectorAll('#bookingTable tbody tr[data-group]');
+        var empty = document.getElementById('noRows');
+        Array.prototype.forEach.call(tabs, function (tab) {
+            tab.addEventListener('click', function () {
+                Array.prototype.forEach.call(tabs, function (t) { t.classList.remove('on'); });
+                tab.classList.add('on');
+                var f = tab.getAttribute('data-filter'), shown = 0;
+                Array.prototype.forEach.call(rows, function (r) {
+                    var ok = f === 'all' || (' ' + r.getAttribute('data-group') + ' ').indexOf(' ' + f + ' ') >= 0;
+                    r.style.display = ok ? '' : 'none';
+                    if (ok) shown++;
+                });
+                empty.style.display = shown ? 'none' : '';
+            });
+        });
+    })();
+</script>

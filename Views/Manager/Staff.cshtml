@@ -1,0 +1,372 @@
+﻿@model SnisDrivingSchool.Models.MgrStaffPage
+@using SnisDrivingSchool.Models
+@using Newtonsoft.Json
+@{
+    ViewBag.Title = "Manager - Staff";
+    ViewBag.Active = "Staff";
+    var form = ViewBag.Form as Dictionary<string, string> ?? new Dictionary<string, string>();
+    Func<string, string> f = k => form.ContainsKey(k) ? form[k] : "";
+    int pending = Model.Instructors.Count(i => (i.Status ?? "").StartsWith("Pending", StringComparison.OrdinalIgnoreCase));
+    int approved = Model.Instructors.Count(i => (i.Status ?? "").Equals("Approved", StringComparison.OrdinalIgnoreCase));
+}
+@Html.Partial("_ManagerNav")
+
+<div class="manager-header">
+    <h2>Staff</h2>
+    <p>Everyone who works at the school: office staff and instructors.</p>
+</div>
+
+
+<div class="manager-panel">
+    <div class="manager-panel-header">
+        <h3>Staff</h3>
+        <div>
+            <button type="button" class="btn-accent" data-toggle="modal" data-target="#addInstructorModal">+ Add instructor</button>
+            <button type="button" class="btn-accent" data-toggle="modal" data-target="#addStaffModal">+ Add receptionist</button>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="contact-success-message">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="login-error">@TempData["Error"]</div>
+    }
+    @if (ViewBag.Error != null)
+    {
+        <div class="login-error">@ViewBag.Error</div>
+    }
+
+    <div class="m-stats">
+        <div class="m-stat"><div class="l">Office staff</div><div class="v">@Model.Admin.Count</div></div>
+        <div class="m-stat"><div class="l">Instructors</div><div class="v">@Model.Instructors.Count</div></div>
+        <div class="m-stat"><div class="l">Approved instructors</div><div class="v">@approved</div></div>
+        <div class="m-stat"><div class="l">Waiting for approval</div><div class="v">@pending</div></div>
+    </div>
+
+    <div class="search-bar" style="display:flex;gap:10px;">
+        <select id="staffType" class="form-control-custom" style="max-width:220px;height:42px;">
+            <option value="all">Show: everyone</option>
+            <option value="office">Show: managers and receptionists</option>
+            <option value="instructor">Show: instructors</option>
+            <option value="pending">Show: instructors waiting for approval</option>
+        </select>
+        <input type="text" id="staffSearch" class="form-control-custom" placeholder="Search by name, email, username or status" />
+    </div>
+
+    <div class="m-table-wrap">
+        <table class="m-table" id="staffTable">
+            <thead>
+                <tr><th>ID</th><th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Username</th><th>Details</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (Model.Admin.Count == 0 && Model.Instructors.Count == 0)
+                {
+                    <tr><td colspan="9">No staff found.</td></tr>
+                }
+                @foreach (var s in Model.Admin)
+                {
+                    bool isManager = (s.Role ?? "").Equals("Manager", StringComparison.OrdinalIgnoreCase);
+                    <tr data-row="1" data-type="office" data-pending="0">
+                        <td>@s.StaffId</td>
+                        <td>@s.Name @s.Surname</td>
+                        <td><span class="m-badge @(isManager ? "m-ok" : "m-info")">@s.Role</span></td>
+                        <td>@s.Phone</td>
+                        <td>@s.Email</td>
+                        <td>@s.UserName</td>
+                        <td>@(string.IsNullOrEmpty(s.OfficeNo) ? "" : "Office " + s.OfficeNo)</td>
+                        <td><span class="m-badge m-ok">Active</span></td>
+                        <td>
+                            <button type="button" class="m-act" data-dialog="editStaffDialog"
+                                    data-fields="@JsonConvert.SerializeObject(new { id = s.StaffId, who = s.Name + " " + s.Surname, phone = s.Phone, email = s.Email, officeNo = s.OfficeNo })">Edit</button>
+                        </td>
+                    </tr>
+                }
+                @foreach (var i in Model.Instructors)
+                {
+                    bool isPending = (i.Status ?? "").StartsWith("Pending", StringComparison.OrdinalIgnoreCase);
+                    <tr data-row="1" data-type="instructor" data-pending="@(isPending ? "1" : "0")">
+                        <td>@i.InstructorId</td>
+                        <td>@i.Name @i.Surname</td>
+                        <td><span class="m-badge m-warn">Instructor</span></td>
+                        <td>@i.Phone</td>
+                        <td>@i.Email</td>
+                        <td>@i.UserName</td>
+                        <td>@i.LicenseCode@(string.IsNullOrEmpty(i.Years) ? "" : " · " + i.Years + " yrs")</td>
+                        <td>
+                            <span class="m-badge @MgrUi.Badge(i.Status)">@i.Status</span>
+                            @if (Model.Leave.ContainsKey(i.InstructorId))
+                            {
+                                foreach (var lv in Model.Leave[i.InstructorId])
+                                {
+                                    <div>
+                                        <span class="lv-tag" title="@lv.Note">On leave @lv.Text</span>
+                                        @using (Html.BeginForm("RemoveLeave", "Manager", FormMethod.Post, new { @class = "m-inline", onsubmit = "return confirm('Remove this leave?');" }))
+                                        {
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="leaveId" value="@lv.LeaveId" />
+                                            <button type="submit" class="lv-x" title="Remove this leave">&times;</button>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </td>
+                        <td style="white-space:nowrap">
+                            @if (!isPending)
+                            {
+                                <button type="button" class="m-act" data-leave="@i.InstructorId" data-name="@i.Name @i.Surname">Leave</button>
+                            }
+                            @if (isPending)
+                            {
+                                using (Html.BeginForm("SetInstructorStatus", "Manager", FormMethod.Post, new { @class = "m-inline" }))
+                                {
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@i.InstructorId" />
+                                    <input type="hidden" name="status" value="Approved" />
+                                    <button type="submit" class="m-act ok">Approve</button>
+                                }
+                                using (Html.BeginForm("SetInstructorStatus", "Manager", FormMethod.Post, new { @class = "m-inline", onsubmit = "return confirm('Reject this instructor? They will not be able to log in.');" }))
+                                {
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@i.InstructorId" />
+                                    <input type="hidden" name="status" value="Rejected" />
+                                    <button type="submit" class="m-act bad">Reject</button>
+                                }
+                            }
+                            <button type="button" class="m-act" data-dialog="editInstructorDialog"
+                                    data-fields="@JsonConvert.SerializeObject(new { id = i.InstructorId, who = i.Name + " " + i.Surname, phone = i.Phone, email = i.Email, licenseCode = i.LicenseCode, years = i.Years, status = isPending ? "Pending Approval" : i.Status })">Edit</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@Html.Partial("~/Views/Shared/_LeaveDialog.cshtml", "Manager")
+
+@if (ViewBag.OpenModal == true)
+{
+    <div id="openModalFlag" data-modal="@(ViewBag.OpenModalId ?? "addStaffModal")" style="display:none"></div>
+}
+
+<!-- Edit receptionist -->
+<dialog class="m-dialog dlg-wide" id="editStaffDialog">
+    @using (Html.BeginForm("EditStaff", "Manager", FormMethod.Post, new { autocomplete = "off" }))
+    {
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" />
+        <div class="m-dialog-head"><h4>Edit <span data-show="who"></span></h4><button type="button" data-close-dialog>&times;</button></div>
+        <div class="m-dialog-body form-2col">
+            <div class="form-group-custom"><label>Phone number</label><input type="text" name="phone" class="form-control-custom" maxlength="15" required /></div>
+            <div class="form-group-custom"><label>Email</label><input type="email" name="email" class="form-control-custom" maxlength="100" required /></div>
+            <div class="form-group-custom"><label>Office number (optional)</label><input type="text" name="officeNo" class="form-control-custom" maxlength="10" /></div>
+        </div>
+        <div class="m-dialog-foot"><button type="button" class="btn-outline-accent" data-close-dialog>Cancel</button><button type="submit" class="btn-accent">Save changes</button></div>
+    }
+</dialog>
+
+<!-- Edit instructor -->
+<dialog class="m-dialog dlg-wide" id="editInstructorDialog">
+    @using (Html.BeginForm("EditInstructor", "Manager", FormMethod.Post, new { autocomplete = "off" }))
+    {
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" />
+        <div class="m-dialog-head"><h4>Edit <span data-show="who"></span></h4><button type="button" data-close-dialog>&times;</button></div>
+        <div class="m-dialog-body form-2col">
+            <div class="form-group-custom"><label>Phone number</label><input type="text" name="phone" class="form-control-custom" maxlength="15" required /></div>
+            <div class="form-group-custom"><label>Email</label><input type="email" name="email" class="form-control-custom" maxlength="100" required /></div>
+            <div class="form-group-custom">
+                <label>Licence code</label>
+                <input type="text" name="licenseCode" class="form-control-custom" maxlength="50" list="licenceCodes" required />
+                <datalist id="licenceCodes"><option value="Code 8"></option><option value="Code 10"></option><option value="Code 14"></option><option value="Code 14 + PDP"></option></datalist>
+            </div>
+            <div class="form-group-custom"><label>Years of experience</label><input type="number" name="years" class="form-control-custom" min="0" max="60" required /></div>
+            <div class="form-group-custom">
+                <label>Status</label>
+                <select name="status" class="form-control-custom" style="height:42px">
+                    <option value="Approved">Approved (can log in)</option>
+                    <option value="Pending Approval">Pending approval (waiting)</option>
+                    <option value="Rejected">Rejected (cannot log in)</option>
+                </select>
+            </div>
+        </div>
+        <div class="m-dialog-foot"><button type="button" class="btn-outline-accent" data-close-dialog>Cancel</button><button type="submit" class="btn-accent">Save changes</button></div>
+    }
+</dialog>
+
+<!-- Add Receptionist Modal -->
+<div class="modal fade" id="addStaffModal" tabindex="-1" role="dialog" aria-labelledby="addStaffModalLabel">
+    <div class="modal-dialog modal-wide" role="document">
+        <div class="modal-content modal-content-custom">
+            @using (Html.BeginForm("AddStaff", "Manager", FormMethod.Post, new { autocomplete = "off" }))
+            {
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="addStaffModalLabel">Register new receptionist</h4>
+                </div>
+                <div class="modal-body form-2col">
+                    @if (ViewBag.ModalError != null)
+                    {
+                        <div class="login-error">@ViewBag.ModalError</div>
+                    }
+                    <div class="form-group-custom">
+                        <label>First name</label>
+                        <input type="text" name="name" class="form-control-custom" maxlength="50" value="@f("name")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Surname</label>
+                        <input type="text" name="surname" class="form-control-custom" maxlength="50" value="@f("surname")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Phone number</label>
+                        <input type="text" name="phone" class="form-control-custom" maxlength="15" value="@f("phone")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Email</label>
+                        <input type="text" name="email" class="form-control-custom" maxlength="100" value="@f("email")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Username</label>
+                        <input type="text" name="userName" class="form-control-custom" maxlength="50" value="@f("userName")" />
+                        <span class="m-hint">No spaces. They can log in with this username or their email.</span>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Office number (optional)</label>
+                        <input type="text" name="officeNo" class="form-control-custom" maxlength="10" value="@f("officeNo")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Password</label>
+                        <input type="password" name="password" class="form-control-custom" maxlength="50" autocomplete="new-password" />
+                        <span class="m-hint">At least 6 characters.</span>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Confirm password</label>
+                        <input type="password" name="confirmPassword" class="form-control-custom" maxlength="50" autocomplete="new-password" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label style="margin-right:15px;">
+                            <input type="radio" name="pwView" value="hide" checked
+                                   onchange="var f=this.form;f.elements['password'].type='password';f.elements['confirmPassword'].type='password';" /> Hide passwords
+                        </label>
+                        <label>
+                            <input type="radio" name="pwView" value="show"
+                                   onchange="var f=this.form;f.elements['password'].type='text';f.elements['confirmPassword'].type='text';" /> Show passwords
+                        </label>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Role</label>
+                        <input type="text" class="form-control-custom" value="Receptionist" readonly />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline-accent" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-accent">Save receptionist</button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Add Instructor Modal -->
+<div class="modal fade" id="addInstructorModal" tabindex="-1" role="dialog" aria-labelledby="addInstructorModalLabel">
+    <div class="modal-dialog modal-wide" role="document">
+        <div class="modal-content modal-content-custom">
+            @using (Html.BeginForm("AddInstructor", "Manager", FormMethod.Post, new { autocomplete = "off" }))
+            {
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="addInstructorModalLabel">Register new instructor</h4>
+                </div>
+                <div class="modal-body form-2col">
+                    @if (ViewBag.ModalError != null)
+                    {
+                        <div class="login-error">@ViewBag.ModalError</div>
+                    }
+                    <div class="form-group-custom">
+                        <label>First name</label>
+                        <input type="text" name="name" class="form-control-custom" maxlength="50" value="@f("name")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Surname</label>
+                        <input type="text" name="surname" class="form-control-custom" maxlength="50" value="@f("surname")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Phone number</label>
+                        <input type="text" name="phone" class="form-control-custom" maxlength="15" value="@f("phone")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Email</label>
+                        <input type="text" name="email" class="form-control-custom" maxlength="100" value="@f("email")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Username</label>
+                        <input type="text" name="userName" class="form-control-custom" maxlength="50" value="@f("userName")" />
+                        <span class="m-hint">No spaces. They can log in with this username or their email.</span>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Licence code</label>
+                        <select name="licenseCode" class="form-control-custom">
+                            <option value="">-- Select licence code --</option>
+                            @foreach (var code in new[] { "Code 8", "Code 10", "Code 14", "Code 14 + PDP" })
+                            {
+                                <option value="@code" @(f("licenseCode") == code ? "selected" : "")>@code</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Years of experience</label>
+                        <input type="number" name="years" class="form-control-custom" min="0" max="60" value="@f("years")" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Password</label>
+                        <input type="password" name="password" class="form-control-custom" maxlength="50" autocomplete="new-password" />
+                        <span class="m-hint">At least 6 characters. The instructor is saved as Approved.</span>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Confirm password</label>
+                        <input type="password" name="confirmPassword" class="form-control-custom" maxlength="50" autocomplete="new-password" />
+                    </div>
+                    <div class="form-group-custom">
+                        <label style="margin-right:15px;">
+                            <input type="radio" name="pwView" value="hide" checked
+                                   onchange="var f=this.form;f.elements['password'].type='password';f.elements['confirmPassword'].type='password';" /> Hide passwords
+                        </label>
+                        <label>
+                            <input type="radio" name="pwView" value="show"
+                                   onchange="var f=this.form;f.elements['password'].type='text';f.elements['confirmPassword'].type='text';" /> Show passwords
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline-accent" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-accent">Save instructor</button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+
+<script>
+    window.addEventListener('load', function () {
+        // "Show" drop-down + search box
+        var type = document.getElementById('staffType');
+        var box = document.getElementById('staffSearch');
+        function apply() {
+            var t = type.value, q = box.value.toLowerCase();
+            Array.prototype.forEach.call(document.querySelectorAll('tr[data-row]'), function (tr) {
+                var show = tr.textContent.toLowerCase().indexOf(q) > -1;
+                if ((t === 'office' || t === 'instructor') && tr.getAttribute('data-type') !== t) show = false;
+                if (t === 'pending' && tr.getAttribute('data-pending') !== '1') show = false;
+                tr.style.display = show ? '' : 'none';
+            });
+        }
+        type.addEventListener('change', apply);
+        box.addEventListener('input', apply);
+    });
+</script>

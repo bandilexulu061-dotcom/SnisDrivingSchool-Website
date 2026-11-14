@@ -1,0 +1,67 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title - Sni's Driving School</title>
+    @Styles.Render("~/Content/css")
+    @* custom.css again with a version number, so the browser never keeps an old copy after an update *@
+    <link href="@Url.Content("~/Content/custom.css")?v=@System.IO.File.GetLastWriteTimeUtc(Server.MapPath("~/Content/custom.css")).Ticks" rel="stylesheet" />
+    @Scripts.Render("~/bundles/modernizr")
+    @RenderSection("scripts", required: false)
+</head>
+<body>
+    @{
+        string role = Convert.ToString(Session["Role"]);
+        bool isGuest = string.IsNullOrEmpty(role);
+        bool isStudent = role == "Student";
+        string homeController = isGuest ? null : role;   // Manager, Receptionist, Instructor or Student home page
+    }
+    @* Top menu on every page. It does not depend on Bootstrap's collapse classes (Bootstrap 5 hides the old Bootstrap 3 menu). *@
+    <nav class="sn-nav" aria-label="Main menu">
+        <div class="sn-nav-inner">
+            @Html.ActionLink("Sni's Driving School", "Index", "Home", null, new { @class = "sn-brand" })
+            <input type="checkbox" id="snMenuToggle" class="sn-toggle" aria-label="Open the menu" />
+            <label for="snMenuToggle" class="sn-burger" aria-hidden="true"><span></span><span></span><span></span></label>
+
+            <div class="sn-links">
+                <ul class="sn-left">
+                    <li>@Html.ActionLink("Home", "Index", "Home")</li>
+                    <li>@Html.ActionLink("About", "About", "Home")</li>
+                    <li>@Html.ActionLink("Contact", "Contact", "Home")</li>
+                    @if (!isGuest)
+                    {
+                        <li>@Html.ActionLink("My dashboard", "Index", homeController)</li>
+                    }
+                </ul>
+                <ul class="sn-right">
+                    @if (!isGuest)
+                    {
+                        <li><a href="@Url.Action("Index", homeController)" class="sn-user" title="Go to your dashboard">&#128100; @Session["UserName"] <small>(@role)</small></a></li>
+                     
+                        if (isStudent)
+                        {
+                            <li>@Html.ActionLink("Profile", "Profile", "Student")</li>
+                        }
+                        <li><a href="@Url.Action("Logout", "Account")" class="sn-logout">Log out</a></li>
+                    }
+                    else
+                    {
+                        <li>@Html.ActionLink("Log in", "Login", "Account")</li>
+                        <li>@Html.ActionLink("Register", "Register", "Account", null, new { @class = "sn-cta" })</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container body-content" style="padding-top: 80px;">
+        @RenderBody()
+        <hr />
+        <footer>
+            <p>&copy; @DateTime.Now.Year - Sni's Driving School</p>
+        </footer>
+    </div>
+    @Scripts.Render("~/bundles/jquery")
+    <script src="~/Scripts/bootstrap.bundle.min.js"></script>
+</body>
+</html>

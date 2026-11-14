@@ -1,0 +1,145 @@
+﻿@model IEnumerable<SnisDrivingSchool.Models.VehicleRow>
+@{
+    ViewBag.Title = "Receptionist - Vehicles";
+    ViewBag.Active = "Vehicles";
+    var vform = TempData["VehicleForm"] as Dictionary<string, string>;
+    Func<string, string> vf = k => vform != null && vform.ContainsKey(k) ? vform[k] : "";
+}
+@Html.Partial("_ReceptionistNav")
+
+<div class="manager-header">
+    <h2>Vehicles</h2>
+    <p>The school's cars and trucks. Add a vehicle or check licence disk dates.</p>
+</div>
+
+<div class="manager-panel">
+    <div class="manager-panel-header">
+        <h3>Vehicles</h3>
+        <button type="button" class="btn-accent" onclick="document.getElementById('addVehicleDialog').showModal()">+ Add vehicle</button>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="contact-success-message">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="login-error">@TempData["Error"]</div>
+    }
+
+    <div class="search-bar">
+        <input type="text" id="tableSearch" class="form-control-custom" placeholder="Search vehicles by registration, model, or status" />
+    </div>
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="login-error">@ViewBag.Error</div>
+    }
+
+    <div class="m-table-wrap">
+        <table class="m-table" id="vehiclesTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Registration</th>
+                    <th>Model</th>
+                    <th>Licence code</th>
+                    <th>Disk expiry</th>
+                    <th>Status</th>
+                    <th>Archived</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var x in Model)
+                {
+                    <tr>
+                        <td>@x.VehicleID</td>
+                        <td>@x.RegistractionNo</td>
+                        <td>@x.Model</td>
+                        <td>@x.LicenseCode</td>
+                        <td>@x.DiskExpiryDate.ToString("yyyy-MM-dd")</td>
+                        <td>@x.VehicleStatus</td>
+                        <td>@(x.Archived ? "Yes" : "No")</td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="7">No vehicles found.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section scripts {
+    <script>
+        // Rendered in <head>, so wait until the page has finished loading.
+        document.addEventListener("DOMContentLoaded", function () {
+            var search = document.getElementById("tableSearch");
+            if (!search) return;
+            search.addEventListener("keyup", function () {
+                var q = this.value.toLowerCase();
+                document.querySelectorAll("#vehiclesTable tbody tr").forEach(function (row) {
+                    row.style.display = row.textContent.toLowerCase().indexOf(q) > -1 ? "" : "none";
+                });
+            });
+        });
+    </script>
+}
+
+<!-- Add vehicle pop-up -->
+<style>
+    dialog.rv-dialog { background: var(--navy-mid); color: var(--text-light); border: 1px solid #2a3557; border-radius: 10px; padding: 0; width: 720px; max-width: calc(100vw - 32px); }
+    dialog.rv-dialog::backdrop { background: rgba(5, 10, 25, .7); }
+    .rv-dialog .h { padding: 14px 20px; border-bottom: 1px solid #2a3557; font-size: 18px; }
+    .rv-dialog .b { padding: 16px 20px; }
+    .rv-dialog .f { padding: 12px 20px; border-top: 1px solid #2a3557; text-align: right; }
+    .rv-dialog .f .btn-outline-accent { margin-right: 8px; }
+</style>
+<dialog class="rv-dialog" id="addVehicleDialog">
+    @using (Html.BeginForm("AddVehicle", "Receptionist", FormMethod.Post, new { autocomplete = "off" }))
+    {
+        @Html.AntiForgeryToken()
+        <div class="h">Register new vehicle</div>
+        <div class="b form-2col">
+            <div class="form-group-custom">
+                <label>Registration number</label>
+                <input type="text" name="registrationNo" class="form-control-custom" maxlength="20" required pattern="[A-Za-z0-9 \-]{3,20}" title="Letters, numbers and spaces, e.g. ND 202 KZN" value="@vf("registrationNo")" />
+                <span style="color:var(--text-muted);font-size:12px;">For example ND 202 KZN.</span>
+            </div>
+            <div class="form-group-custom">
+                <label>Model</label>
+                <input type="text" name="model" class="form-control-custom" maxlength="50" required value="@vf("model")" />
+            </div>
+            <div class="form-group-custom">
+                <label>Licence code</label>
+                <select name="licenseCode" class="form-control-custom" required>
+                    <option value="">-- Select licence code --</option>
+                    <option value="8" @(vf("licenseCode") == "8" ? "selected" : "")>Code 8</option>
+                    <option value="10" @(vf("licenseCode") == "10" ? "selected" : "")>Code 10</option>
+                    <option value="14" @(vf("licenseCode") == "14" ? "selected" : "")>Code 14</option>
+                </select>
+            </div>
+            <div class="form-group-custom">
+                <label>Licence disk expiry date</label>
+                <input type="date" name="diskExpiry" class="form-control-custom" required min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@vf("diskExpiry")" />
+            </div>
+            <div class="form-group-custom">
+                <label>Vehicle status</label>
+                <select name="status" class="form-control-custom">
+                    <option value="Available" @(vf("status") == "Available" || vf("status") == "" ? "selected" : "")>Available</option>
+                    <option value="In Use" @(vf("status") == "In Use" ? "selected" : "")>In Use</option>
+                    <option value="Maintenance" @(vf("status") == "Maintenance" ? "selected" : "")>Maintenance</option>
+                </select>
+            </div>
+        </div>
+        <div class="f">
+            <button type="button" class="btn-outline-accent" onclick="document.getElementById('addVehicleDialog').close()">Cancel</button>
+            <button type="submit" class="btn-accent">Save vehicle</button>
+        </div>
+    }
+</dialog>
+@if (vform != null)
+{
+    <script>window.addEventListener('load', function () { document.getElementById('addVehicleDialog').showModal(); });</script>
+}

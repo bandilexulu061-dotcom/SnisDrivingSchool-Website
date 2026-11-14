@@ -1,0 +1,191 @@
+﻿@model SnisDrivingSchool.Models.MgrHome
+@{
+    ViewBag.Title = "Manager Dashboard";
+    string name = ViewBag.Name as string;
+    int cancelWaiting = SnisDrivingSchool.Replacement.OpenRequestCount();
+}
+
+<style>
+    .mh-head {
+        margin: 10px 0 22px;
+    }
+
+        .mh-head h2 {
+            margin: 0;
+            font-size: 30px;
+        }
+
+        .mh-head p {
+            margin: 4px 0 0;
+            color: var(--text-muted);
+        }
+
+    .mh-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .mh-tile {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 20px;
+        min-height: 190px;
+        background: var(--navy-mid);
+        border: 1px solid #2a3557;
+        border-radius: 12px;
+        color: var(--text-light);
+        text-decoration: none;
+        transition: .15s ease;
+    }
+
+        .mh-tile:hover {
+            border-color: var(--accent-blue-light);
+            transform: translateY(-2px);
+            text-decoration: none;
+            color: var(--text-light);
+        }
+
+    .mh-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background: #1b3a5a;
+        color: #9cc9ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .mh-tile h3 {
+        margin: 0;
+        font-size: 19px;
+    }
+
+    .mh-tile p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .mh-num {
+        margin-top: auto;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+
+        .mh-num b {
+            font-size: 28px;
+        }
+
+        .mh-num span {
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+    .mh-flag {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+        .mh-flag.warn {
+            background: #4a3a1b;
+            color: #ffd89c;
+        }
+
+        .mh-flag.bad {
+            background: #4a1b1b;
+            color: #ff9c9c;
+        }
+
+        .mh-flag.ok {
+            background: #1b4a2b;
+            color: #9cffb0;
+        }
+
+    .mh-open {
+        color: var(--accent-blue-light);
+        font-size: 13px;
+        font-weight: 600;
+    }
+</style>
+
+<div class="mh-head">
+    <h2>Manager dashboard</h2>
+    <p>@(string.IsNullOrEmpty(name) ? "Welcome back." : "Welcome back, " + name + ".") Choose what you want to work on.</p>
+</div>
+
+@if (ViewBag.Error != null)
+{
+    <div class="login-error">@ViewBag.Error</div>
+}
+
+<div class="mh-grid">
+    <a class="mh-tile" href="@Url.Action("Bookings", "Manager")">
+        <div class="mh-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg></div>
+        <h3>Bookings</h3>
+        <p>Every lesson booked by students and reception.</p>
+        <div class="mh-num"><b>@Model.Bookings</b><span>total · @Model.ThisWeek this week</span></div>
+        @if (Model.ToConfirm > 0)
+        {<span class="mh-flag warn">@Model.ToConfirm upcoming booking@(Model.ToConfirm == 1 ? "" : "s") not paid yet</span>}
+    else
+    {<span class="mh-open">Open bookings &rarr;</span>}
+    </a>
+
+    <a class="mh-tile" href="@Url.Action("CancelRequests", "Manager")">
+        <div class="mh-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg></div>
+        <h3>Cancellation requests</h3>
+        <p>Instructors asking to cancel a lesson. Accept to give it to another instructor.</p>
+        <div class="mh-num"><b>@cancelWaiting</b><span>waiting</span></div>
+        @if (cancelWaiting > 0)
+        {<span class="mh-flag warn">@cancelWaiting request@(cancelWaiting == 1 ? "" : "s") to answer</span>}
+    else
+    {<span class="mh-open">Open requests &rarr;</span>}
+    </a>
+
+    <a class="mh-tile" href="@Url.Action("Students", "Manager")">
+        <div class="mh-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg></div>
+        <h3>Students</h3>
+        <p>Registered learners and their details. Register new students.</p>
+        <div class="mh-num"><b>@Model.Students</b><span>students</span></div>
+        <span class="mh-open">Open students &rarr;</span>
+    </a>
+
+    <a class="mh-tile" href="@Url.Action("Staff", "Manager")">
+        <div class="mh-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /></svg></div>
+        <h3>Staff</h3>
+        <p>Receptionists and instructors. Add, edit and approve.</p>
+        <div class="mh-num"><b>@(Model.Office + Model.Instructors)</b><span>@Model.Office office · @Model.Instructors instructors</span></div>
+        @if (Model.PendingInstructors > 0)
+        {<span class="mh-flag warn">@Model.PendingInstructors instructor@(Model.PendingInstructors == 1 ? "" : "s") to approve</span>}
+    else
+    {<span class="mh-open">Open staff &rarr;</span>}
+    </a>
+
+    <a class="mh-tile" href="@Url.Action("Vehicles", "Manager")">
+        <div class="mh-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14v-5l-2-5H7l-2 5v5z" /><circle cx="7.5" cy="17.5" r="1.5" /><circle cx="16.5" cy="17.5" r="1.5" /><line x1="5" y1="12" x2="19" y2="12" /></svg></div>
+        <h3>Vehicles</h3>
+        <p>The fleet, licence disk dates and vehicle status.</p>
+        <div class="mh-num"><b>@Model.Vehicles</b><span>vehicles</span></div>
+        @if (Model.DisksExpired > 0)
+        {<span class="mh-flag bad">@Model.DisksExpired licence disk@(Model.DisksExpired == 1 ? "" : "s") expired</span>}
+    else if (Model.DisksDue > 0)
+    {<span class="mh-flag warn">@Model.DisksDue disk@(Model.DisksDue == 1 ? "" : "s") due in 30 days</span>}
+else
+{<span class="mh-flag ok">All licence disks valid</span>}
+    </a>
+
+    <a class="mh-tile" href="@Url.Action("Reports", "Manager")">
+        <div class="mh-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg></div>
+        <h3>Reports</h3>
+        <p>Charts and tables for bookings, students, instructors, vehicles and payments.</p>
+        <div class="mh-num"><b>5</b><span>report tabs · filters · export</span></div>
+        <span class="mh-open">Open reports &rarr;</span>
+    </a>
+</div>

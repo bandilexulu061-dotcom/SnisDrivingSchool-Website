@@ -1,0 +1,120 @@
+@model SnisDrivingSchool.Models.ReceptionPaymentsReport
+@{
+    ViewBag.Title = "Receptionist - Reports";
+    ViewBag.Active = "Reports";
+    var inv = System.Globalization.CultureInfo.InvariantCulture;
+    Func<decimal, string> R = v => "R " + v.ToString("N2", inv);
+    var pays = Model.Payments;
+    decimal total = pays.Sum(x => x.Amount);
+    decimal refunds = pays.Sum(x => x.Refund);
+    string period = Model.Month > 0 ? new DateTime(Model.Year, Model.Month, 1).ToString("MMMM yyyy") : Model.Year.ToString();
+}
+<style>
+    .rp-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .rp-kpi { background: var(--navy-dark); border: 1px solid #2a3557; border-radius: 10px; padding: 12px 14px; }
+    .rp-kpi .l { color: var(--text-muted); font-size: 12px; }
+    .rp-kpi .v { font-size: 22px; font-weight: 700; }
+    .rp-kpi .d { color: var(--text-muted); font-size: 12px; }
+    .rp-filter { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+    .rp-filter label { display: block; color: var(--text-muted); font-size: 13px; margin-bottom: 4px; }
+    .rp-filter select { width: 160px; height: 40px; }
+    .rp-tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; background: #1b3a5a; color: #9cc9ff; }
+    .rp-tag.card { background: #2c2350; color: #c9b8ff; }
+    @@media (max-width: 767px) { .rp-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @@media print { .manager-nav, .rp-filter, .navbar, footer { display: none !important; } }
+</style>
+
+@Html.Partial("_ReceptionistNav")
+
+<div class="manager-header">
+    <h2>Payments report</h2>
+    <p>Who paid, when, how much and how.</p>
+</div>
+
+<div class="manager-panel">
+    <div class="manager-panel-header">
+        <h3>Payments - @period</h3>
+        <button type="button" class="btn-outline-accent" onclick="window.print()">Print</button>
+    </div>
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="login-error">@ViewBag.Error</div>
+    }
+
+    <form method="get" action="@Url.Action("Reports", "Receptionist")" class="rp-filter">
+        <div>
+            <label for="rpYear">Year</label>
+            <select id="rpYear" name="year" class="form-control-custom">
+                @for (int y = DateTime.Today.Year; y >= DateTime.Today.Year - 3; y--)
+                {
+                    <option value="@y" @(y == Model.Year ? "selected" : "")>@y</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label for="rpMonth">Month</label>
+            <select id="rpMonth" name="month" class="form-control-custom">
+                <option value="0" @(Model.Month == 0 ? "selected" : "")>Whole year</option>
+                @for (int m = 1; m <= 12; m++)
+                {
+                    <option value="@m" @(m == Model.Month ? "selected" : "")>@(new DateTime(2000, m, 1).ToString("MMMM"))</option>
+                }
+            </select>
+        </div>
+        <button type="submit" class="btn-accent" style="height:40px;padding:0 22px;">Show</button>
+    </form>
+
+    <div class="rp-kpis">
+        <div class="rp-kpi"><div class="l">Payments received</div><div class="v">@pays.Count</div><div class="d">@period</div></div>
+        <div class="rp-kpi"><div class="l">Total paid</div><div class="v">@R(total)</div><div class="d">@R(total - refunds) after refunds</div></div>
+        <div class="rp-kpi"><div class="l">Card / EFT</div><div class="v">@pays.Count(x => x.Method == "Card") / @pays.Count(x => x.Method == "EFT")</div><div class="d">@pays.Count(x => x.Method != "Card" && x.Method != "EFT") other (older cash)</div></div>
+        <div class="rp-kpi"><div class="l">Upcoming, not paid</div><div class="v">@Model.UnpaidCount</div><div class="d">@R(Model.UnpaidAmount) still to be paid</div></div>
+    </div>
+
+    <div class="m-table-wrap">
+        <table class="m-table" id="payTable">
+            <thead>
+                <tr>
+                    <th>Paid on</th>
+                    <th>Student</th>
+                    <th>Booking</th>
+                    <th>Package</th>
+                    <th>Lesson date</th>
+                    <th>Method</th>
+                    <th style="text-align:right">Amount</th>
+                    <th style="text-align:right">Refunded</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var x in pays)
+                {
+                    <tr>
+                        <td>@x.PaidOn.ToString("yyyy/MM/dd HH:mm")</td>
+                        <td>@x.Student</td>
+                        <td>#@x.BookingId</td>
+                        <td>@x.Package</td>
+                        <td>@x.LessonDate.ToString("yyyy/MM/dd")</td>
+                        <td><span class="m-badge @(x.Method == "Card" ? "m-warn" : "m-info")">@(x.Method == "" ? "-" : x.Method)</span></td>
+                        <td style="text-align:right">@R(x.Amount)</td>
+                        <td style="text-align:right">@(x.Refund > 0 ? R(x.Refund) : "-")</td>
+                    </tr>
+                }
+                @if (pays.Count == 0)
+                {
+                    <tr><td colspan="8">No payments in @period.</td></tr>
+                }
+            </tbody>
+            @if (pays.Count > 0)
+            {
+                <tfoot>
+                    <tr style="font-weight:700">
+                        <td colspan="6">Total</td>
+                        <td style="text-align:right">@R(total)</td>
+                        <td style="text-align:right">@(refunds > 0 ? R(refunds) : "-")</td>
+                    </tr>
+                </tfoot>
+            }
+        </table>
+    </div>
+</div>

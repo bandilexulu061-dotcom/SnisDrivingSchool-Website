@@ -1,0 +1,141 @@
+﻿@model SnisDrivingSchool.Models.MgrStaffPage
+@{
+    ViewBag.Title = "Receptionist - Staff";
+    ViewBag.Active = "Staff";
+    string show = Request.QueryString["show"] ?? "all";
+}
+<style>
+    .rs-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .rs-ok { background: #1b4a2b; color: #9cffb0; }
+    .rs-info { background: #1b3a5a; color: #9cc9ff; }
+    .rs-warn { background: #4a3a1b; color: #ffd89c; }
+    .rs-bad { background: #4a1b1b; color: #ff9c9c; }
+    .rs-act { background: transparent; border: 1px solid #2a3a66; color: var(--text-light); border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+    .rs-act:hover { border-color: var(--accent-blue); }
+</style>
+@Html.Partial("_ReceptionistNav")
+
+<div class="manager-header">
+    <h2>Staff</h2>
+    <p>Everyone who works at the school: office staff and instructors. Only the manager can add or edit staff.</p>
+</div>
+
+<div class="manager-panel">
+    <div class="manager-panel-header">
+        <h3>Staff (@(Model.Admin.Count + Model.Instructors.Count))</h3>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="contact-success-message">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="login-error">@TempData["Error"]</div>
+    }
+    @if (ViewBag.Error != null)
+    {
+        <div class="login-error">@ViewBag.Error</div>
+    }
+
+    <div class="search-bar" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <select id="staffType" class="form-control-custom" style="max-width:240px;height:42px;">
+            <option value="all" @(show == "all" ? "selected" : "")>Show: everyone</option>
+            <option value="receptionist" @(show == "receptionist" ? "selected" : "")>Show: receptionists</option>
+            <option value="manager" @(show == "manager" ? "selected" : "")>Show: managers</option>
+            <option value="instructor" @(show == "instructor" ? "selected" : "")>Show: instructors</option>
+        </select>
+        <input type="text" id="tableSearch" class="form-control-custom" placeholder="Search by name, email, role or licence" />
+    </div>
+
+    <div class="m-table-wrap">
+        <table class="m-table" id="staffTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Username</th>
+                    <th>Details</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var x in Model.Admin)
+                {
+                    bool manager = (x.Role ?? "").Equals("Manager", StringComparison.OrdinalIgnoreCase);
+                    <tr data-type="@(manager ? "manager" : "receptionist")">
+                        <td>@x.Name @x.Surname</td>
+                        <td><span class="m-badge @(manager ? "m-ok" : "m-info")">@x.Role</span></td>
+                        <td>@x.Phone</td>
+                        <td>@x.Email</td>
+                        <td>@x.UserName</td>
+                        <td>@(string.IsNullOrEmpty(x.OfficeNo) ? "" : "Office " + x.OfficeNo)</td>
+                        <td><span class="m-badge m-ok">Active</span></td>
+                        <td></td>
+                    </tr>
+                }
+                @foreach (var i in Model.Instructors)
+                {
+                    bool approved = (i.Status ?? "").Equals("Approved", StringComparison.OrdinalIgnoreCase);
+                    bool pending = (i.Status ?? "").StartsWith("Pending", StringComparison.OrdinalIgnoreCase);
+                    <tr data-type="instructor">
+                        <td>@i.Name @i.Surname</td>
+                        <td><span class="m-badge m-warn">Instructor</span></td>
+                        <td>@i.Phone</td>
+                        <td>@i.Email</td>
+                        <td>@i.UserName</td>
+                        <td>@i.LicenseCode@(string.IsNullOrEmpty(i.Years) ? "" : " · " + i.Years + " yrs")</td>
+                        <td>
+                            <span class="m-badge @(approved ? "m-ok" : pending ? "m-warn" : "m-bad")">@i.Status</span>
+                            @if (Model.Leave.ContainsKey(i.InstructorId))
+                            {
+                                foreach (var lv in Model.Leave[i.InstructorId])
+                                {
+                                    <div>
+                                        <span class="lv-tag" title="@lv.Note">On leave @lv.Text</span>
+                                        @using (Html.BeginForm("RemoveLeave", "Receptionist", FormMethod.Post, new { style = "display:inline", onsubmit = "return confirm('Remove this leave?');" }))
+                                        {
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="leaveId" value="@lv.LeaveId" />
+                                            <button type="submit" class="lv-x" title="Remove this leave">&times;</button>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </td>
+                        <td>
+                            @if (approved)
+                            {
+                                <button type="button" class="m-act" data-leave="@i.InstructorId" data-name="@i.Name @i.Surname">Record leave</button>
+                            }
+                        </td>
+                    </tr>
+                }
+                <tr id="noStaff" style="display:none"><td colspan="8">No staff match.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@Html.Partial("~/Views/Shared/_LeaveDialog.cshtml", "Receptionist")
+
+<script>
+    (function () {
+        var type = document.getElementById('staffType'), search = document.getElementById('tableSearch');
+        function filter() {
+            var t = type.value, q = search.value.toLowerCase(), shown = 0;
+            Array.prototype.forEach.call(document.querySelectorAll('#staffTable tbody tr[data-type]'), function (row) {
+                var ok = (t === 'all' || row.getAttribute('data-type') === t) && row.textContent.toLowerCase().indexOf(q) > -1;
+                row.style.display = ok ? '' : 'none';
+                if (ok) shown++;
+            });
+            document.getElementById('noStaff').style.display = shown ? 'none' : '';
+        }
+        type.addEventListener('change', filter);
+        search.addEventListener('keyup', filter);
+        filter();
+    })();
+</script>

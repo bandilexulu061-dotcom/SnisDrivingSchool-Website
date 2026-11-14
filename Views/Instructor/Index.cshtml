@@ -1,0 +1,271 @@
+﻿@model List<SnisDrivingSchool.Controllers.InstructorBooking>
+@{
+    ViewBag.Title = "Instructor Dashboard";
+    var today = DateTime.Today;
+    var upcoming = Model.Where(b => b.BookingDate.Date >= today && !b.IsCancelled && !b.IsCompleted).ToList();
+    var toComplete = Model.Where(b => b.CanComplete).OrderBy(b => b.BookingDate).ToList();
+    var past = Model.Where(b => !upcoming.Contains(b) && !b.CanComplete).OrderByDescending(b => b.BookingDate).ToList();
+    var reviews = ViewBag.Reviews as List<SnisDrivingSchool.LessonReview> ?? new List<SnisDrivingSchool.LessonReview>();
+    var rating = ViewBag.Rating as SnisDrivingSchool.RatingSummary ?? new SnisDrivingSchool.RatingSummary();
+    DateTime monday = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+    int thisWeek = upcoming.Count(b => b.BookingDate.Date < monday.AddDays(7));
+    int cancelledByMe = Model.Count(b => b.IsCancelled && b.CancelledBy == SnisDrivingSchool.Cancellation.ByInstructor);
+}
+
+<style>
+    .ib-wrap { max-width: 1150px; margin: 30px auto; }
+    .ib-wrap h2 { color: #fff; margin-bottom: 4px; }
+    .ib-sub { color: #8fa8e6; margin: 0 0 18px; }
+    .ib-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    @@media (max-width: 767px) { .ib-stats { grid-template-columns: repeat(2, 1fr); } }
+    .ib-done { background: #1e7a46; color: #fff; border: 0; border-radius: 6px; padding: 5px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .ib-done:hover { background: #26995a; }
+    .ib-card.ib-todo { border: 1px solid #1f5a37; }
+    .ib-stars { color: #ffd166; letter-spacing: 1px; white-space: nowrap; }
+    .ib-review { padding: 12px 0; border-top: 1px solid #22325a; }
+    .ib-review:first-of-type { border-top: 0; padding-top: 0; }
+    .ib-review .who { color: #8fa8e6; font-size: 12px; margin-top: 2px; }
+    .ib-review p { margin: 6px 0 0; color: #e6ecff; }
+    .ib-stat { background: #131f3a; border: 1px solid #22325a; border-radius: 10px; padding: 12px 16px; color: #fff; }
+    .ib-stat .l { color: #8fa8e6; font-size: 12px; }
+    .ib-stat .v { font-size: 24px; font-weight: 700; }
+    .ib-card { background: #131f3a; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+    .ib-card h3 { color: #fff; margin: 0 0 12px; font-size: 18px; }
+    .ib-table { width: 100%; border-collapse: collapse; color: #e6ecff; font-size: 14px; }
+    .ib-table th { text-align: left; padding: 10px; background: #1b2a4e; color: #fff; white-space: nowrap; }
+    .ib-table td { padding: 10px; border-bottom: 1px solid #22325a; vertical-align: top; }
+    .ib-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .b-booked { background: #1b4a2b; color: #9cffb0; }
+    .b-pending { background: #4a3a1b; color: #ffd89c; }
+    .b-cancelled { background: #4a1b1b; color: #ff9c9c; }
+    .b-completed { background: #1b3a5a; color: #9cc9ff; }
+    .ib-reason { color: #b8c2d9; font-size: 12px; margin-top: 4px; max-width: 320px; }
+    .ib-cancel { background: transparent; border: 1px solid #7a2a2a; color: #ff9c9c; border-radius: 6px; padding: 4px 12px; font-size: 13px; cursor: pointer; }
+    .ib-cancel:hover { background: #4a1b1b; }
+    .ib-empty { color: #8fa8e6; }
+    .ib-msg { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
+    .ib-ok { background: #1b4a2b; color: #c8ffd4; }
+    .ib-err { background: #4a1b1b; color: #ffd0d0; }
+    dialog.ib-dialog { background: #14213d; color: #f4f6fb; border: 1px solid #2a3557; border-radius: 10px; padding: 0; width: 460px; max-width: calc(100vw - 32px); }
+    dialog.ib-dialog::backdrop { background: rgba(5, 10, 25, .7); }
+    .ib-dhead { padding: 14px 20px; border-bottom: 1px solid #2a3557; font-size: 18px; font-weight: 600; }
+    .ib-dbody { padding: 16px 20px; }
+    .ib-dbody dl { display: grid; grid-template-columns: 90px 1fr; gap: 4px 10px; margin: 0 0 12px; }
+    .ib-dbody dt { color: #8fa8e6; }
+    .ib-dbody dd { margin: 0; }
+    .ib-dbody textarea { width: 100%; box-sizing: border-box; min-height: 90px; background: #0d1733; color: #f4f6fb; border: 1px solid #2a3a66; border-radius: 6px; padding: 8px; }
+    .ib-hint { color: #8fa8e6; font-size: 12px; margin-top: 4px; }
+    .ib-dfoot { padding: 12px 20px; border-top: 1px solid #2a3557; text-align: right; }
+    .ib-btn { background: #c0392b; color: #fff; border: 0; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
+    .ib-btn-grey { background: transparent; border: 1px solid #4d8dff; color: #4d8dff; margin-right: 8px; }
+</style>
+
+@helper StatusBadge(SnisDrivingSchool.Controllers.InstructorBooking b)
+{
+    string css = b.IsCancelled ? "b-cancelled" : b.IsCompleted ? "b-completed" : b.Status == "Booked" ? "b-booked" : "b-pending";
+    <span class="ib-badge @css">@SnisDrivingSchool.Cancellation.StatusText(b.Status, b.CancelledBy)</span>
+    if (!string.IsNullOrEmpty(b.HandedTo))
+    {
+        <div class="ib-reason">Handed to @b.HandedTo, waiting for the student to accept.</div>
+    }
+    if (b.IsCancelled && !string.IsNullOrEmpty(b.CancelReason))
+    {
+        <div class="ib-reason">"@b.CancelReason"@(b.CancelledOn.HasValue ? " · " + b.CancelledOn.Value.ToString("yyyy/MM/dd HH:mm") : "")</div>
+    }
+}
+
+<div class="ib-wrap">
+    <h2>Instructor Dashboard</h2>
+    <p class="ib-sub">Welcome, @Session["UserName"]. These are the lessons you are booked for.</p>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="ib-msg ib-ok">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="ib-msg ib-err">@TempData["Error"]</div>
+    }
+    @if (ViewBag.Error != null)
+    {
+        <div class="ib-msg ib-err">@ViewBag.Error</div>
+    }
+
+    <div class="ib-stats">
+        <div class="ib-stat"><div class="l">Upcoming lessons</div><div class="v">@upcoming.Count</div></div>
+        <div class="ib-stat"><div class="l">This week</div><div class="v">@thisWeek</div></div>
+        <div class="ib-stat"><div class="l">To mark as done</div><div class="v">@toComplete.Count</div></div>
+        <div class="ib-stat"><div class="l">My rating</div><div class="v">@(rating.Count == 0 ? "-" : rating.Average.ToString("0.0"))<span style="font-size:14px;color:#8fa8e6;font-weight:400;"> @(rating.Count == 0 ? "no reviews yet" : "/ 5 · " + rating.Count + " review" + (rating.Count == 1 ? "" : "s"))</span></div></div>
+    </div>
+
+    @if (toComplete.Count > 0)
+    {
+        <div class="ib-card ib-todo">
+            <h3>Ready to mark as done (@toComplete.Count)</h3>
+            <p class="ib-sub" style="margin-top:-6px;">Paid lessons whose day has come. Mark each one as done after the lesson so the student can rate it.</p>
+            <table class="ib-table">
+                <thead>
+                    <tr><th>Date</th><th>Time</th><th>Student</th><th>Package</th><th>Code</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in toComplete)
+                    {
+                        <tr>
+                            <td>@b.DateRange@(b.BookingDate.Date == today ? " (today)" : "")@(b.LessonCount > 1 ? " · " + b.LessonCount + " lessons" : "")</td>
+                            <td>@b.TimeText</td>
+                            <td>@b.StudentName</td>
+                            <td>@b.PackageName</td>
+                            <td>@(string.IsNullOrEmpty(b.LicenceCode) ? "-" : b.LicenceCode)</td>
+                            <td style="text-align:right;">
+                                @using (Html.BeginForm("Complete", "Instructor", FormMethod.Post, new { style = "display:inline", onsubmit = "return confirm('Mark this lesson with " + b.StudentName.Replace("'", "") + " as done?');" }))
+                                {
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="bookingId" value="@b.BookingID" />
+                                    <button type="submit" class="ib-done">Mark as done</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <div class="ib-card">
+        <h3>Upcoming lessons (@upcoming.Count)</h3>
+        @if (upcoming.Count == 0)
+        {
+            <div class="ib-empty">You have no upcoming lessons.</div>
+        }
+        else
+        {
+            <table class="ib-table">
+                <thead>
+                    <tr><th>Date</th><th>Time</th><th>Student</th><th>Package</th><th>Code</th><th>Payment</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in upcoming)
+                    {
+                        string dateText = b.DateRange + (b.LessonCount > 1 ? " · " + b.LessonCount + " lessons" : "");
+                        <tr>
+                            <td>@dateText</td>
+                            <td>@b.TimeText</td>
+                            <td>@b.StudentName</td>
+                            <td>@b.PackageName</td>
+                            <td>@(string.IsNullOrEmpty(b.LicenceCode) ? "-" : b.LicenceCode)</td>
+                            <td>@b.PaymentStatus</td>
+                            <td>@StatusBadge(b)</td>
+                            <td>
+                                @if (b.CanCancel)
+                                {
+                                    <button type="button" class="ib-cancel" onclick="openCancel(this)"
+                                            data-id="@b.BookingID" data-date="@dateText" data-time="@b.TimeText"
+                                            data-student="@b.StudentName" data-payment="@b.PaymentStatus">Cancel</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="ib-card">
+        <h3>Past and cancelled lessons (@past.Count)</h3>
+        @if (past.Count == 0)
+        {
+            <div class="ib-empty">Nothing here yet.</div>
+        }
+        else
+        {
+            <table class="ib-table">
+                <thead>
+                    <tr><th>Date</th><th>Time</th><th>Student</th><th>Package</th><th>Code</th><th>Payment</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in past)
+                    {
+                        <tr>
+                            <td>@b.DateRange</td>
+                            <td>@b.TimeText</td>
+                            <td>@b.StudentName</td>
+                            <td>@b.PackageName</td>
+                            <td>@(string.IsNullOrEmpty(b.LicenceCode) ? "-" : b.LicenceCode)</td>
+                            <td>@(b.RefundAmount > 0 ? "Refunded R" + b.RefundAmount.ToString("N2") : b.PaymentStatus)</td>
+                            <td>@StatusBadge(b)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<div class="ib-wrap" style="margin-top:0;">
+    <div class="ib-card">
+        <h3>What students say</h3>
+        @if (reviews.Count == 0)
+        {
+            <div class="ib-empty">No reviews yet. Students can rate a lesson after you mark it as done.</div>
+        }
+        else
+        {
+            foreach (var rv in reviews.Take(8))
+            {
+                <div class="ib-review">
+                    <span class="ib-stars">@SnisDrivingSchool.Lessons.Stars(rv.Rating)</span>
+                    <div class="who">@rv.Student · @rv.PackageName · lesson on @rv.LessonDate.ToString("d MMM yyyy")</div>
+                    @if (!string.IsNullOrEmpty(rv.Comment))
+                    {
+                        <p>"@rv.Comment"</p>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<!-- Cancel pop-up: a reason is required -->
+<dialog class="ib-dialog" id="cancelDialog">
+    @using (Html.BeginForm("Cancel", "Instructor", FormMethod.Post))
+    {
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="bookingId" id="mBookingId" />
+        <div class="ib-dhead">Cancel this lesson?</div>
+        <div class="ib-dbody">
+            <dl>
+                <dt>Date</dt><dd id="mDate"></dd>
+                <dt>Time</dt><dd id="mTime"></dd>
+                <dt>Student</dt><dd id="mStudent"></dd>
+                <dt>Payment</dt><dd id="mPayment"></dd>
+            </dl>
+            <label for="mReason">Why are you cancelling?</label>
+            <textarea id="mReason" name="reason" required minlength="@SnisDrivingSchool.Cancellation.MinReason" maxlength="@SnisDrivingSchool.Cancellation.MaxReason"
+                      placeholder="e.g. My vehicle is in for repairs that day and no other vehicle is available."></textarea>
+            <div class="ib-hint">The system first looks for another instructor who is free at the same time and asks the student to accept them.
+                Only if nobody is free is the lesson cancelled (refunded if paid). The student sees your reason.
+                If you are on leave, ask the manager or reception to record it instead.</div>
+        </div>
+        <div class="ib-dfoot">
+            <button type="button" class="ib-btn ib-btn-grey" onclick="closeCancel()">Keep lesson</button>
+            <button type="submit" class="ib-btn">Cancel lesson</button>
+        </div>
+    }
+</dialog>
+
+<script>
+    function openCancel(btn) {
+        document.getElementById('mBookingId').value = btn.getAttribute('data-id');
+        document.getElementById('mDate').textContent = btn.getAttribute('data-date');
+        document.getElementById('mTime').textContent = btn.getAttribute('data-time');
+        document.getElementById('mStudent').textContent = btn.getAttribute('data-student');
+        document.getElementById('mPayment').textContent = btn.getAttribute('data-payment');
+        document.getElementById('mReason').value = '';
+        var d = document.getElementById('cancelDialog');
+        if (d.showModal) d.showModal(); else d.setAttribute('open', 'open');
+    }
+    function closeCancel() {
+        var d = document.getElementById('cancelDialog');
+        if (d.close) d.close(); else d.removeAttribute('open');
+    }
+</script>

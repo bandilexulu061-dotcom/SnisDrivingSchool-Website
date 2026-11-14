@@ -1,0 +1,538 @@
+﻿@model SnisDrivingSchool.Models.ReportVm
+@using SnisDrivingSchool.Models
+@using Newtonsoft.Json
+@using System.Globalization
+@{
+    ViewBag.Title = "Manager - Reports";
+    ViewBag.Active = "Reports";
+    var F = Model.Filter;
+    var inv = CultureInfo.InvariantCulture;
+    Func<decimal, string> R = v => "R " + v.ToString("N0", inv);
+    Func<decimal, decimal, string> Pct = (v, total) => total == 0 ? "0%" : Math.Round(100 * v / total).ToString(inv) + "%";
+    string[] months = { "All months", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
+    var ins = Model.InstructorRows ?? new List<ReportPerson>();
+    var stu = Model.StudentRows ?? new List<ReportPerson>();
+    var veh = Model.Vehicles ?? new List<MgrVehicleRow>();
+    var bk = Model.Bookings ?? new List<ReportBooking>();
+    DateTime today = DateTime.Today;
+    int vehExpired = veh.Count(v => v.DiskExpiry.HasValue && v.DiskExpiry.Value.Date < today);
+    int vehDue = veh.Count(v => v.DiskExpiry.HasValue && v.DiskExpiry.Value.Date >= today && v.DiskExpiry.Value.Date <= today.AddDays(30));
+    string periodText = (F.Month > 0 ? months[F.Month] + " " : "") + (F.Year > 0 ? F.Year.ToString(inv) : "all years");
+
+    // Everything the charts need, handed to the JavaScript at the bottom of the page
+    var chartData = new
+    {
+        months = Model.MonthLabels ?? new List<string>(),
+        perMonth = Model.BookingsPerMonth ?? new List<int>(),
+        revenue = Model.RevenuePerMonth ?? new List<decimal>(),
+        status = Model.ByStatus ?? new List<NameValue>(),
+        package = Model.ByPackage ?? new List<NameValue>(),
+        studentStatus = Model.StudentStatus ?? new List<NameValue>(),
+        topStudents = stu.Take(10).Select(s => new { s.Name, s.Bookings }),
+        perInstructor = ins.Where(i => i.Bookings > 0).Take(12).Select(i => new { i.Name, i.Bookings }),
+        vehicleStatus = Model.VehicleStatus ?? new List<NameValue>(),
+        vehicleCodes = Model.VehicleCodes ?? new List<NameValue>(),
+        payState = Model.PayState ?? new List<NameValue>(),
+        method = Model.ByMethod ?? new List<NameValue>()
+    };
+}
+
+@helper Legend(List<NameValue> items)
+{
+    decimal total = items.Sum(x => x.Value);
+    <div class="r-legend">
+        @foreach (var x in items)
+        {
+            <div><i style="background:@x.Color"></i>@x.Name <span>@x.Value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) · @(total == 0 ? "0" : Math.Round(100 * x.Value / total).ToString(System.Globalization.CultureInfo.InvariantCulture))%</span></div>
+        }
+    </div>
+}
+
+@helper Donut(string id, List<NameValue> items, string center, string sub)
+{
+    if (items == null || items.Count == 0)
+    {
+        <p class="r-empty">No data for these filters.</p>
+    }
+    else
+    {
+        <div class="r-donut-wrap">
+            <div class="r-donut"><canvas id="@id" width="190" height="190"></canvas><div class="r-donut-center"><b>@center</b><span>@sub</span></div></div>
+            @Legend(items)
+        </div>
+    }
+}
+
+<style>
+    /* The site's normal page column is narrow, so the Reports page breaks out to use more of the screen */
+    .r-wide { width: min(1560px, calc(100vw - 48px)); position: relative; left: 50%; transform: translateX(-50%); }
+    .r-layout { display: flex; gap: 18px; align-items: flex-start; }
+    .r-side { width: 210px; flex: none; background: var(--navy-mid); border: 1px solid #2a3557; border-radius: 10px; padding: 14px; position: sticky; top: 12px; }
+    .r-side h3 { margin: 0 0 6px; font-size: 16px; }
+    .r-side label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin: 9px 0 3px; }
+    .r-side select { width: 100%; height: 34px; font-size: 13px; background: #0d1733; color: var(--text-light); border: 1px solid #2a3a66; border-radius: 6px; padding: 0 6px; }
+    .r-side .r-btns { display: flex; gap: 8px; margin-top: 14px; }
+    .r-side .r-btns .btn-accent, .r-side .r-btns .btn-outline-accent { flex: 1; padding: 7px 0; font-size: 14px; text-align: center; text-decoration: none; }
+    .r-side .r-note { font-size: 11px; color: var(--text-muted); margin-top: 12px; }
+    .r-main { flex: 1; min-width: 0; }
+    .r-tabs { display: flex; gap: 2px; border-bottom: 1px solid #2a3a66; margin-bottom: 16px; flex-wrap: wrap; }
+    .r-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted); padding: 10px 18px; font-size: 14px; cursor: pointer; }
+    .r-tabs button.on { color: #fff; border-bottom-color: var(--accent-blue); font-weight: 600; }
+    .r-tabs .r-print { margin-left: auto; }
+    .r-pane { display: none; }
+    .r-pane.on { display: block; }
+    .r-kpis { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 12px; margin-bottom: 16px; }
+    .r-kpi, .r-card { background: var(--navy-mid); border: 1px solid #2a3557; border-radius: 10px; padding: 14px 16px; }
+    .r-kpi .l { color: var(--text-muted); font-size: 12px; }
+    .r-kpi .v { font-size: 24px; font-weight: 700; margin-top: 2px; white-space: nowrap; }
+    .r-kpi .l, .r-kpi .d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .r-kpi .d { color: var(--text-muted); font-size: 12px; }
+    .r-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .r-card { margin-bottom: 16px; }
+    .r-grid2 .r-card { margin-bottom: 0; }
+    .r-card h3 { margin: 0; font-size: 15px; }
+    .r-card .cap { color: var(--text-muted); font-size: 12px; margin: 2px 0 12px; }
+    .r-card-head { display: flex; align-items: flex-start; gap: 10px; }
+    .r-card-head .m-act { margin-left: auto; }
+    .r-chart { position: relative; height: 280px; }
+    .r-donut-wrap { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+    .r-donut { position: relative; width: 190px; height: 190px; }
+    .r-donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+    .r-donut-center b { font-size: 24px; }
+    .r-donut-center span { font-size: 11px; color: var(--text-muted); }
+    .r-legend { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+    .r-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; }
+    .r-legend span { color: var(--text-muted); margin-left: 6px; }
+    .r-empty { color: var(--text-muted); font-size: 13px; padding: 20px 0; }
+    .r-meter { margin-bottom: 12px; }
+    .r-meter .t { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+    .r-meter .t span { color: var(--text-muted); }
+    .r-meter .bar { height: 10px; border-radius: 5px; background: #1d2d55; }
+    .r-meter .bar div { height: 10px; border-radius: 5px; background: var(--accent-blue); }
+    .r-num, .m-table th.r-num { text-align: right; font-variant-numeric: tabular-nums; }
+    @@media (max-width: 1100px) { .r-kpis { grid-auto-flow: row; grid-template-columns: repeat(2, 1fr); } }
+    @@media (max-width: 900px) { .r-wide { width: 100%; left: 0; transform: none; } .r-layout { flex-direction: column; } .r-side { width: 100%; position: static; } .r-grid2 { grid-template-columns: 1fr; } }
+    @@media print {
+        .r-side, .manager-nav, .r-tabs, header, nav, footer, .navbar, .m-act { display: none !important; }
+        .r-pane { display: block !important; page-break-after: always; }
+        body { background: #fff !important; color: #000 !important; }
+    }
+</style>
+
+<div class="r-wide">
+@Html.Partial("_ManagerNav")
+
+<div class="manager-header">
+    <h2>Reports</h2>
+    <p>One tab per area of the school. The filters on the left apply to every tab (vehicles are always shown in full).</p>
+</div>
+
+
+@if (ViewBag.Error != null)
+{
+    <div class="login-error">@ViewBag.Error</div>
+}
+
+<div class="r-layout">
+    <!-- Filters -->
+    <form class="r-side" method="get" action="@Url.Action("Reports", "Manager")">
+        <h3>Filters</h3>
+        <input type="hidden" name="tab" id="tabField" value="@F.Tab" />
+
+        <label for="fYear">Year</label>
+        <select id="fYear" name="year">
+            <option value="0" @(F.Year == 0 ? "selected" : "")>All years</option>
+            @foreach (var y in Model.Years ?? new List<int>())
+            {
+                <option value="@y" @(F.Year == y ? "selected" : "")>@y</option>
+            }
+        </select>
+
+        <label for="fMonth">Month</label>
+        <select id="fMonth" name="month">
+            @for (int m = 0; m <= 12; m++)
+            {
+                <option value="@m" @(F.Month == m ? "selected" : "")>@months[m]</option>
+            }
+        </select>
+
+        <label for="fIns">Instructor</label>
+        <select id="fIns" name="instructorId">
+            <option value="0">All instructors</option>
+            @foreach (var x in Model.InstructorList ?? new List<NameValue>())
+            {
+                <option value="@x.Value" @(F.InstructorId == (int)x.Value ? "selected" : "")>@x.Name</option>
+            }
+        </select>
+
+        <label for="fStu">Student</label>
+        <select id="fStu" name="studentId">
+            <option value="0">All students</option>
+            @foreach (var x in Model.StudentList ?? new List<NameValue>())
+            {
+                <option value="@x.Value" @(F.StudentId == (int)x.Value ? "selected" : "")>@x.Name</option>
+            }
+        </select>
+
+        <label for="fPkg">Package</label>
+        <select id="fPkg" name="packageId">
+            <option value="0">All packages</option>
+            @foreach (var x in Model.PackageList ?? new List<NameValue>())
+            {
+                <option value="@x.Value" @(F.PackageId == (int)x.Value ? "selected" : "")>@x.Name</option>
+            }
+        </select>
+
+        <label for="fBs">Booking status</label>
+        <select id="fBs" name="bookingStatus">
+            <option value="">All statuses</option>
+            @foreach (var x in Model.StatusList ?? new List<string>())
+            {
+                <option value="@x" @(F.BookingStatus == x ? "selected" : "")>@x</option>
+            }
+        </select>
+
+        <label for="fPs">Payment status</label>
+        <select id="fPs" name="paymentStatus">
+            <option value="">All</option>
+            <option value="Paid" @(F.PaymentStatus == "Paid" ? "selected" : "")>Paid</option>
+            <option value="Unpaid" @(F.PaymentStatus == "Unpaid" ? "selected" : "")>Unpaid</option>
+            <option value="Refunded" @(F.PaymentStatus == "Refunded" ? "selected" : "")>Refunded</option>
+        </select>
+
+        <label for="fCb">Cancelled by</label>
+        <select id="fCb" name="cancelledBy">
+            <option value="">Anyone / not cancelled</option>
+            <option value="Student" @(F.CancelledBy == "Student" ? "selected" : "")>Cancelled by student</option>
+            <option value="Instructor" @(F.CancelledBy == "Instructor" ? "selected" : "")>Cancelled by instructor</option>
+        </select>
+
+        <div class="r-btns">
+            <button type="submit" class="btn-accent">Apply</button>
+            <a class="btn-outline-accent" href="@Url.Action("Reports", "Manager", new { tab = F.Tab })">Clear</a>
+        </div>
+        <p class="r-note">Showing @bk.Count booking@(bk.Count == 1 ? "" : "s") for @periodText.</p>
+    </form>
+
+    <div class="r-main">
+        <div class="r-tabs">
+            <button type="button" data-tab="overview">Overview</button>
+            <button type="button" data-tab="students">Students</button>
+            <button type="button" data-tab="instructors">Instructors</button>
+            <button type="button" data-tab="vehicles">Vehicles</button>
+            <button type="button" data-tab="payments">Payments</button>
+            <button type="button" class="m-act r-print" onclick="window.print()">Print / save as PDF</button>
+        </div>
+
+        <!-- ================= OVERVIEW ================= -->
+        <div class="r-pane" id="pane-overview">
+            <div class="r-kpis">
+                <div class="r-kpi"><div class="l">Bookings</div><div class="v">@Model.BookingCount</div><div class="d">@periodText</div></div>
+                <div class="r-kpi"><div class="l">Revenue (confirmed)</div><div class="v">@R(Model.Revenue)</div><div class="d">@Model.PaidCount paid bookings</div></div>
+                <div class="r-kpi"><div class="l">Students with bookings</div><div class="v">@Model.ActiveStudents</div><div class="d">in this period</div></div>
+                <div class="r-kpi"><div class="l">Instructors</div><div class="v">@Model.InstructorsApproved</div><div class="d">approved · @Model.InstructorsPending waiting</div></div>
+                <div class="r-kpi"><div class="l">Not paid yet</div><div class="v">@Model.UnpaidCount</div><div class="d">@R(Model.UnpaidAmount) outstanding</div></div>
+            </div>
+            <div class="r-grid2">
+                <div class="r-card"><h3>Bookings per @(F.Year > 0 ? "month" : "year")</h3><p class="cap">Number of bookings</p><div class="r-chart"><canvas id="cBookings"></canvas></div></div>
+                <div class="r-card"><h3>Revenue per @(F.Year > 0 ? "month" : "year")</h3><p class="cap">Confirmed payments only</p><div class="r-chart"><canvas id="cRevenue"></canvas></div></div>
+            </div>
+            <div class="r-grid2">
+                <div class="r-card"><h3>Booking status</h3><p class="cap">Share of bookings</p>@Donut("cStatus", Model.ByStatus, Model.BookingCount.ToString(inv), "bookings")</div>
+                <div class="r-card"><h3>Bookings by package</h3><p class="cap">Which packages students choose</p>@Donut("cPackage", Model.ByPackage, Model.BookingCount.ToString(inv), "bookings")</div>
+            </div>
+            <div class="r-card">
+                <div class="r-card-head"><div><h3>Bookings</h3><p class="cap">Newest first (up to 100)</p></div><button type="button" class="m-act" data-export="tBookings" data-file="bookings">Export to Excel</button></div>
+                <div class="m-table-wrap">
+                    <table class="m-table" id="tBookings">
+                        <thead><tr><th>ID</th><th>Date</th><th>Student</th><th>Instructor</th><th>Package</th><th>Status</th><th>Reason</th><th>Payment</th><th class="r-num">Price</th></tr></thead>
+                        <tbody>
+                            @foreach (var b in bk.Take(100))
+                            {
+                                <tr><td>@b.BookingId</td><td>@b.Date.ToString("yyyy/MM/dd")</td><td>@b.Student</td><td>@b.Instructor</td><td>@b.Package</td><td><span class="m-badge @MgrUi.Badge(b.StatusText)">@b.StatusText</span>@(b.CancelledOn.HasValue ? " " + b.CancelledOn.Value.ToString("yyyy/MM/dd") : "")</td><td style="white-space:normal;max-width:240px;">@b.CancelReason</td><td>@(b.Refunded ? "Refunded " + R(b.RefundAmount) : b.PayText)</td><td class="r-num">@R(b.Price)</td></tr>
+                            }
+                            @if (bk.Count == 0)
+                            {
+                                <tr><td colspan="9">No bookings match these filters.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= STUDENTS ================= -->
+        <div class="r-pane" id="pane-students">
+            <div class="r-kpis">
+                <div class="r-kpi"><div class="l">Registered students</div><div class="v">@((Model.StudentStatus ?? new List<NameValue>()).Sum(x => x.Value).ToString("N0", inv))</div><div class="d">all accounts</div></div>
+                <div class="r-kpi"><div class="l">Students with bookings</div><div class="v">@Model.StudentsWithBookings</div><div class="d">@periodText</div></div>
+                <div class="r-kpi"><div class="l">Average bookings</div><div class="v">@(Model.StudentsWithBookings == 0 ? "0" : Math.Round((double)Model.BookingCount / Model.StudentsWithBookings, 1).ToString(inv))</div><div class="d">per student</div></div>
+                <div class="r-kpi"><div class="l">Still owed</div><div class="v">@R(Model.OutstandingTotal)</div><div class="d">unpaid, not cancelled</div></div>
+            </div>
+            <div class="r-grid2">
+                <div class="r-card"><h3>Student accounts</h3><p class="cap">By account status</p>@Donut("cStudentStatus", Model.StudentStatus, (Model.StudentStatus ?? new List<NameValue>()).Sum(x => x.Value).ToString("N0", inv), "students")</div>
+                <div class="r-card"><h3>Most bookings</h3><p class="cap">Top 10 students in this period</p><div class="r-chart"><canvas id="cTopStudents"></canvas></div></div>
+            </div>
+            <div class="r-card">
+                <div class="r-card-head"><div><h3>Student summary</h3><p class="cap">Pick a student in the filters to see only their bookings</p></div><button type="button" class="m-act" data-export="tStudents" data-file="students">Export to Excel</button></div>
+                <div class="m-table-wrap">
+                    <table class="m-table" id="tStudents">
+                        <thead><tr><th>Student</th><th class="r-num">Bookings</th><th class="r-num">Completed</th><th class="r-num">Cancelled</th><th class="r-num">Paid</th><th class="r-num">Still owed</th><th>Last booking</th></tr></thead>
+                        <tbody>
+                            @foreach (var s in stu)
+                            {
+                                <tr><td>@s.Name</td><td class="r-num">@s.Bookings</td><td class="r-num">@s.Completed</td><td class="r-num">@s.Cancelled</td><td class="r-num">@R(s.Paid)</td><td class="r-num">@R(s.Owed)</td><td>@(s.LastBooking.HasValue ? s.LastBooking.Value.ToString("yyyy/MM/dd") : "")</td></tr>
+                            }
+                            @if (stu.Count == 0)
+                            {
+                                <tr><td colspan="7">No students match these filters.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= INSTRUCTORS ================= -->
+        <div class="r-pane" id="pane-instructors">
+            <div class="r-kpis">
+                <div class="r-kpi"><div class="l">Lessons</div><div class="v">@ins.Sum(i => i.Bookings)</div><div class="d">not cancelled · @periodText</div></div>
+                <div class="r-kpi"><div class="l">Average per instructor</div><div class="v">@(ins.Count(i => i.Bookings > 0) == 0 ? "0" : Math.Round((double)ins.Sum(i => i.Bookings) / ins.Count(i => i.Bookings > 0), 1).ToString(inv))</div><div class="d">lessons (instructors with lessons)</div></div>
+                <div class="r-kpi"><div class="l">Average rating</div><div class="v">@(Model.ReviewCount == 0 ? "-" : Model.AverageRating.ToString("0.0", inv) + " / 5")</div><div class="d">@Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s") (all time)</div></div>
+                <div class="r-kpi"><div class="l">Cancelled by instructors</div><div class="v">@Model.CancelledByInstructorCount</div><div class="d">@Model.CancelledByStudentCount cancelled by students</div></div>
+                <div class="r-kpi"><div class="l">Waiting for approval</div><div class="v">@Model.InstructorsPending</div><div class="d">approve them on the Staff page</div></div>
+            </div>
+            <div class="r-grid2">
+                <div class="r-card"><h3>Bookings by package</h3><p class="cap">Which packages are taught (all bookings, including cancelled)</p>@Donut("cInsPackage", Model.ByPackage, Model.BookingCount.ToString(inv), "bookings")</div>
+                <div class="r-card">
+                    <h3>Capacity this week</h3><p class="cap">Booked slots out of available slots (Mon–Sat)</p>
+                    @foreach (var i in ins.Where(x => x.Status.Equals("Approved", StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.CapacityPct).Take(8))
+                    {
+                        <div class="r-meter"><div class="t">@i.Name<span>@i.CapacityPct% booked</span></div><div class="bar"><div style="width:@(i.CapacityPct)%"></div></div></div>
+                    }
+                    @if (!ins.Any(x => x.Status.Equals("Approved", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        <p class="r-empty">No approved instructors.</p>
+                    }
+                </div>
+            </div>
+            <div class="r-card"><h3>Lessons per instructor</h3><p class="cap">Booked and completed lessons in this period</p><div class="r-chart"><canvas id="cPerInstructor"></canvas></div></div>
+            <div class="r-card">
+                <div class="r-card-head"><div><h3>Instructor detail</h3><p class="cap">All instructors</p></div><button type="button" class="m-act" data-export="tInstructors" data-file="instructors">Export to Excel</button></div>
+                <div class="m-table-wrap">
+                    <table class="m-table" id="tInstructors">
+                        <thead><tr><th>Instructor</th><th>Status</th><th>Licence</th><th class="r-num">Students</th><th class="r-num">Lessons</th><th class="r-num">Completed</th><th class="r-num">Cancelled</th><th class="r-num">By instructor</th><th>Rating</th><th class="r-num">Revenue</th></tr></thead>
+                        <tbody>
+                            @foreach (var i in ins)
+                            {
+                                <tr><td>@i.Name</td><td><span class="m-badge @MgrUi.Badge(i.Status)">@i.Status</span></td><td>@i.Extra</td><td class="r-num">@i.Students</td><td class="r-num">@i.Bookings</td><td class="r-num">@i.Completed</td><td class="r-num">@i.Cancelled</td><td class="r-num">@i.CancelledByInstructor</td><td style="white-space:nowrap">@if (i.RatingCount > 0) {<span style="color:#ffd166">&#9733;</span> @i.Rating.ToString("0.0", inv)<span style="color:var(--text-muted)"> (@i.RatingCount)</span>} else {<span style="color:var(--text-muted)">-</span>}</td><td class="r-num">@R(i.Paid)</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= VEHICLES ================= -->
+        <div class="r-pane" id="pane-vehicles">
+            <div class="r-kpis">
+                <div class="r-kpi"><div class="l">Vehicles</div><div class="v">@veh.Count</div><div class="d">in the fleet</div></div>
+                <div class="r-kpi"><div class="l">Available</div><div class="v">@veh.Count(v => v.Status == "Available")</div><div class="d">ready for lessons</div></div>
+                <div class="r-kpi"><div class="l">Disk due in 30 days</div><div class="v">@vehDue</div><div class="d">renew soon</div></div>
+                <div class="r-kpi"><div class="l">Disk expired</div><div class="v" style="@(vehExpired > 0 ? "color:#ff9c9c" : "")">@vehExpired</div><div class="d">must not be driven</div></div>
+            </div>
+            <div class="r-grid2">
+                <div class="r-card"><h3>Fleet status</h3><p class="cap">Expired disks counted separately</p>@Donut("cVehStatus", Model.VehicleStatus, veh.Count.ToString(inv), "vehicles")</div>
+                <div class="r-card"><h3>Licence codes</h3><p class="cap">Vehicles per code</p>@Donut("cVehCodes", Model.VehicleCodes, veh.Count.ToString(inv), "vehicles")</div>
+            </div>
+            <div class="r-card">
+                <div class="r-card-head"><div><h3>Licence disks</h3><p class="cap">Soonest expiry first · update dates on the @Html.ActionLink("Vehicles page", "Vehicles", "Manager")</p></div><button type="button" class="m-act" data-export="tVehicles" data-file="vehicles">Export to Excel</button></div>
+                <div class="m-table-wrap">
+                    <table class="m-table" id="tVehicles">
+                        <thead><tr><th>Registration</th><th>Model</th><th>Code</th><th>Status</th><th>Disk expiry</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var v in veh.OrderBy(x => x.DiskExpiry ?? DateTime.MaxValue))
+                            {
+                                bool expired = v.DiskExpiry.HasValue && v.DiskExpiry.Value.Date < today;
+                                bool due = !expired && v.DiskExpiry.HasValue && v.DiskExpiry.Value.Date <= today.AddDays(30);
+                                <tr>
+                                    <td>@v.RegistrationNo</td><td>@v.Model</td><td>@v.LicenseCode</td>
+                                    <td><span class="m-badge @MgrUi.Badge(v.Status)">@v.Status</span></td>
+                                    <td>@(v.DiskExpiry.HasValue ? v.DiskExpiry.Value.ToString("yyyy/MM/dd") : "")</td>
+                                    <td>
+                                        @if (expired)
+                                        {<span class="m-badge m-bad">Expired</span>}
+                                        else if (due)
+                                        {<span class="m-badge m-due">Due in @((v.DiskExpiry.Value.Date - today).Days) days</span>}
+                                        else
+                                        {<span class="m-badge m-ok">OK</span>}
+                                    </td>
+                                </tr>
+                            }
+                            @if (veh.Count == 0)
+                            {
+                                <tr><td colspan="6">No vehicles found.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= PAYMENTS ================= -->
+        <div class="r-pane" id="pane-payments">
+            <div class="r-kpis">
+                <div class="r-kpi"><div class="l">Revenue (confirmed)</div><div class="v">@R(Model.Revenue)</div><div class="d">@periodText</div></div>
+                <div class="r-kpi"><div class="l">Paid bookings</div><div class="v">@Model.PaidCount</div><div class="d">average @R(Model.PaidCount == 0 ? 0 : Model.Revenue / Model.PaidCount)</div></div>
+                <div class="r-kpi"><div class="l">Paid by card</div><div class="v">@bk.Count(x => x.Paid && x.Method == "Card")</div><div class="d">@bk.Count(x => x.Paid && x.Method == "EFT") by EFT</div></div>
+                <div class="r-kpi"><div class="l">Unpaid</div><div class="v">@Model.UnpaidCount</div><div class="d">@R(Model.UnpaidAmount) outstanding</div></div>
+                <div class="r-kpi"><div class="l">Refunded</div><div class="v">@R(Model.RefundTotal)</div><div class="d">@Model.RefundCount cancelled booking@(Model.RefundCount == 1 ? "" : "s")</div></div>
+            </div>
+            <div class="r-card"><h3>Revenue per @(F.Year > 0 ? "month" : "year")</h3><p class="cap">By payment date</p><div class="r-chart"><canvas id="cRevenue2"></canvas></div></div>
+            <div class="r-grid2">
+                <div class="r-card"><h3>Payment status</h3><p class="cap">Refunded = paid, then cancelled</p>@Donut("cPayState", Model.PayState, (Model.PaidCount + Model.AwaitingCount + Model.UnpaidCount + Model.RefundCount).ToString(inv), "bookings")</div>
+                <div class="r-card"><h3>Payment method</h3><p class="cap">Confirmed payments</p>@Donut("cMethod", Model.ByMethod, Model.PaidCount.ToString(inv), "payments")</div>
+            </div>
+            <div class="r-card">
+                <div class="r-card-head"><div><h3>Payments</h3><p class="cap">Confirmed payments, newest first</p></div><button type="button" class="m-act" data-export="tPayments" data-file="payments">Export to Excel</button></div>
+                <div class="m-table-wrap">
+                    <table class="m-table" id="tPayments">
+                        <thead><tr><th>Booking</th><th>Paid on</th><th>Student</th><th>Package</th><th>Method</th><th class="r-num">Amount</th></tr></thead>
+                        <tbody>
+                            @foreach (var b in bk.Where(x => x.Paid).OrderByDescending(x => x.PaidOn ?? x.Date))
+                            {
+                                <tr><td>@b.BookingId</td><td>@((b.PaidOn ?? b.Date).ToString("yyyy/MM/dd"))</td><td>@b.Student</td><td>@b.Package</td><td>@b.Method</td><td class="r-num">@R(b.PaidAmount)</td></tr>
+                            }
+                            @if (!bk.Any(x => x.Paid))
+                            {
+                                <tr><td colspan="6">No confirmed payments match these filters.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="r-card">
+                <div class="r-card-head"><div><h3>Refunds</h3><p class="cap">Paid bookings that were cancelled, newest first</p></div><button type="button" class="m-act" data-export="tRefunds" data-file="refunds">Export to Excel</button></div>
+                <div class="m-table-wrap">
+                    <table class="m-table" id="tRefunds">
+                        <thead><tr><th>Booking</th><th>Cancelled on</th><th>Student</th><th>Cancelled by</th><th>Reason</th><th class="r-num">Refunded</th></tr></thead>
+                        <tbody>
+                            @foreach (var b in bk.Where(x => x.Refunded).OrderByDescending(x => x.CancelledOn ?? x.Date))
+                            {
+                                <tr><td>@b.BookingId</td><td>@((b.CancelledOn ?? b.Date).ToString("yyyy/MM/dd"))</td><td>@b.Student</td><td>@b.CancelledBy</td><td style="white-space:normal;max-width:260px;">@b.CancelReason</td><td class="r-num">@R(b.RefundAmount)</td></tr>
+                            }
+                            @if (!bk.Any(x => x.Refunded))
+                            {
+                                <tr><td colspan="6">No refunds match these filters.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script>
+    var REPORT = @Html.Raw(JsonConvert.SerializeObject(chartData));
+</script>
+<script>
+(function () {
+    var C = { blue: '#3987e5', green: '#199e70', grid: '#22325a', text: '#b8c2d9', surface: '#14213d' };
+    var made = {};
+
+    function money(v) { return 'R ' + Math.round(v).toLocaleString('en-US'); }
+    function base(isMoney, horizontal) {
+        var valueAxis = { beginAtZero: true, grid: { color: C.grid }, ticks: { color: C.text, precision: 0, callback: function (v) { return isMoney ? money(v) : v; } } };
+        var catAxis = { grid: { display: false }, ticks: { color: C.text } };
+        return {
+            responsive: true, maintainAspectRatio: false, indexAxis: horizontal ? 'y' : 'x',
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { var v = horizontal ? c.parsed.x : c.parsed.y; return ' ' + (isMoney ? money(v) : v); } } } },
+            scales: horizontal ? { x: valueAxis, y: catAxis } : { x: catAxis, y: valueAxis }
+        };
+    }
+    function bar(id, labels, data, horizontal) {
+        var el = document.getElementById(id); if (!el) return;
+        new Chart(el, { type: 'bar', data: { labels: labels, datasets: [{ data: data, backgroundColor: C.blue, borderRadius: 4, maxBarThickness: horizontal ? 18 : 32 }] }, options: base(false, horizontal) });
+    }
+    function line(id, labels, data) {
+        var el = document.getElementById(id); if (!el) return;
+        new Chart(el, { type: 'line', data: { labels: labels, datasets: [{ data: data, borderColor: C.blue, backgroundColor: C.blue, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6, cubicInterpolationMode: 'monotone' }] }, options: base(true, false) });
+    }
+    function donut(id, items) {
+        var el = document.getElementById(id); if (!el || !items.length) return;
+        new Chart(el, {
+            type: 'doughnut',
+            data: { labels: items.map(function (x) { return x.Name; }), datasets: [{ data: items.map(function (x) { return x.Value; }), backgroundColor: items.map(function (x) { return x.Color; }), borderColor: C.surface, borderWidth: 2 }] },
+            options: { responsive: false, cutout: '62%', plugins: { legend: { display: false } } }
+        });
+    }
+    var builders = {
+        overview: function () {
+            bar('cBookings', REPORT.months, REPORT.perMonth);
+            line('cRevenue', REPORT.months, REPORT.revenue);
+            donut('cStatus', REPORT.status);
+            donut('cPackage', REPORT.package);
+        },
+        students: function () {
+            donut('cStudentStatus', REPORT.studentStatus);
+            bar('cTopStudents', REPORT.topStudents.map(function (s) { return s.Name; }), REPORT.topStudents.map(function (s) { return s.Bookings; }), true);
+        },
+        instructors: function () {
+            donut('cInsPackage', REPORT.package);
+            bar('cPerInstructor', REPORT.perInstructor.map(function (s) { return s.Name; }), REPORT.perInstructor.map(function (s) { return s.Bookings; }), true);
+        },
+        vehicles: function () { donut('cVehStatus', REPORT.vehicleStatus); donut('cVehCodes', REPORT.vehicleCodes); },
+        payments: function () { line('cRevenue2', REPORT.months, REPORT.revenue); donut('cPayState', REPORT.payState); donut('cMethod', REPORT.method); }
+    };
+
+    // Tabs: charts are drawn the first time a tab is opened
+    function show(tab) {
+        if (!builders[tab]) tab = 'overview';
+        Array.prototype.forEach.call(document.querySelectorAll('.r-tabs [data-tab]'), function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === tab); });
+        Array.prototype.forEach.call(document.querySelectorAll('.r-pane'), function (p) { p.classList.toggle('on', p.id === 'pane-' + tab); });
+        document.getElementById('tabField').value = tab;
+        if (!made[tab] && window.Chart) {
+            Chart.defaults.color = C.text;
+            Chart.defaults.font.family = "'Segoe UI', Arial, sans-serif";
+            builders[tab]();
+            made[tab] = true;
+        }
+        if (history.replaceState) {
+            var u = new URL(window.location.href); u.searchParams.set('tab', tab); history.replaceState(null, '', u.toString());
+        }
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.r-tabs [data-tab]'), function (b) {
+        b.addEventListener('click', function () { show(b.getAttribute('data-tab')); });
+    });
+    if (!window.Chart) {
+        Array.prototype.forEach.call(document.querySelectorAll('.r-chart'), function (c) {
+            c.innerHTML = '<p class="r-empty">Charts need an internet connection (Chart.js could not load). The tables below still work.</p>';
+        });
+    }
+    show(document.getElementById('tabField').value);
+
+    // Print draws every tab first so nothing is blank
+    window.addEventListener('beforeprint', function () { Object.keys(builders).forEach(function (t) { if (!made[t] && window.Chart) { builders[t](); made[t] = true; } }); });
+
+    // "Export to Excel": downloads the table as a CSV file that Excel opens
+    Array.prototype.forEach.call(document.querySelectorAll('[data-export]'), function (btn) {
+        btn.addEventListener('click', function () {
+            var rows = document.getElementById(btn.getAttribute('data-export')).querySelectorAll('tr');
+            var csv = Array.prototype.map.call(rows, function (tr) {
+                return Array.prototype.map.call(tr.querySelectorAll('th,td'), function (td) {
+                    return '"' + td.textContent.trim().replace(/\s+/g, ' ').replace(/"/g, '""') + '"';
+                }).join(',');
+            }).join('\r\n');
+            var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'snis-' + btn.getAttribute('data-file') + '-report.csv';
+            document.body.appendChild(a); a.click(); a.remove();
+        });
+    });
+})();
+</script>

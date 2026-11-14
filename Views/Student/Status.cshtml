@@ -1,0 +1,88 @@
+@model SnisDrivingSchool.Models.StudentHomeViewModel
+@{
+    Layout = "~/Views/Student/_StudentLayout.cshtml";
+    ViewBag.Title = "Account status";
+    ViewBag.Active = "Home";
+    var acct = Model.Account;
+    bool rejected = acct != null && acct.Stage == SnisDrivingSchool.StudentApproval.Stage.Rejected;
+    string licence = SnisDrivingSchool.Licence.Normalize(Model.Profile == null ? "" : Model.Profile.LicenceStatus);
+}
+
+<style>
+    .ss-steps { display: flex; gap: 8px; margin: 0 0 18px; flex-wrap: wrap; }
+    .ss-steps span { padding: 5px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; background: #1b2a4e; color: var(--text-muted); }
+    .ss-steps span.on { background: var(--accent-blue); color: #fff; }
+    .ss-steps span.done { background: #1b4a2b; color: #9cffb0; }
+    .ss-steps span.bad { background: #4a1b1b; color: #ff9c9c; }
+    .ss-doc { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid #22325a; }
+    .ss-doc:first-of-type { border-top: 0; }
+</style>
+
+<div class="st-head">
+    <div>
+        <h2>@(rejected ? "Your account was not approved" : "Waiting for approval")</h2>
+        <p>@(rejected ? "Reception could not approve your registration." : "Your account is verified. Reception is checking your ID and documents.")</p>
+    </div>
+</div>
+
+<div class="ss-steps">
+    <span class="done">1. Register</span>
+    <span class="done">2. Verify</span>
+    <span class="@(rejected ? "bad" : "on")">3. Approval by reception</span>
+    <span>4. Book &amp; pay</span>
+</div>
+
+<div class="st-grid-2">
+    <div class="st-card">
+        @if (rejected)
+        {
+            <h3>Reason</h3>
+            <div class="st-alert bad" style="margin:10px 0 12px;">@(string.IsNullOrEmpty(acct.Note) ? "No reason was given." : acct.Note)</div>
+            <p style="margin:0;color:var(--text-muted);">Please contact the school, or fix your details and documents on your profile and ask reception to look again.</p>
+        }
+        else
+        {
+            <h3>What happens next</h3>
+            <p class="st-sub">You'll be able to book and pay as soon as reception approves your account.</p>
+            <ul style="margin:0;padding-left:18px;color:var(--text-light);line-height:1.8;">
+                <li>Reception checks your ID document@(SnisDrivingSchool.Licence.NeedsDocument(licence) ? " and licence" : "").</li>
+                <li>They approve your account, usually within one working day.</li>
+                <li>Log in again any time to see if you've been approved.</li>
+            </ul>
+        }
+        <div class="st-actions">
+            <a class="st-btn" href="@Url.Action("Profile", "Student")">Check my profile &amp; documents</a>
+        </div>
+    </div>
+
+    <div class="st-card">
+        <h3>Documents reception will check</h3>
+        <p class="st-sub">Make sure these are on file.</p>
+        <div class="ss-doc">
+            <span>ID document</span>
+            @if (Model.IdDocumentId > 0)
+            {
+                <a class="st-btn small" target="_blank" href="@Url.Action("Open", "Documents", new { id = Model.IdDocumentId })">View PDF</a>
+            }
+            else
+            {
+                <span class="st-badge st-bad">Missing</span>
+            }
+        </div>
+        <div class="ss-doc">
+            <span>@SnisDrivingSchool.Licence.StatusText(licence)</span>
+            @if (!SnisDrivingSchool.Licence.NeedsDocument(licence) && licence != "")
+            {
+                <span class="st-badge st-muted">Not needed</span>
+            }
+            else if (Model.LicenceDocumentId > 0)
+            {
+                <a class="st-btn small" target="_blank" href="@Url.Action("Open", "Documents", new { id = Model.LicenceDocumentId })">View PDF</a>
+            }
+            else
+            {
+                <span class="st-badge st-bad">Missing</span>
+            }
+        </div>
+    </div>
+</div>

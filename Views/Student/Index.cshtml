@@ -1,0 +1,194 @@
+﻿@model SnisDrivingSchool.Models.StudentHomeViewModel
+@using SnisDrivingSchool.Models
+@{
+    Layout = "~/Views/Student/_StudentLayout.cshtml";
+    ViewBag.Title = "Student Home";
+    ViewBag.Active = "Home";
+    var p = Model.Profile ?? new StudentProfile();
+    var next = Model.NextLesson;
+    var upcoming = Model.Upcoming;
+    var toPay = Model.ToPay;
+    var saId = SnisDrivingSchool.SaIdNumber.Parse(p.IdNumber);
+    string licence = SnisDrivingSchool.Licence.Normalize(p.LicenceStatus);
+    bool needsId = Model.IdDocumentId == 0;
+    bool needsLicence = licence == "" || (SnisDrivingSchool.Licence.NeedsDocument(licence) && Model.LicenceDocumentId == 0);
+    var answers = Model.Bookings.Where(b => b.NeedsAnswer).ToList();
+    int todo = (needsId ? 1 : 0) + (needsLicence ? 1 : 0) + toPay.Count + (Model.ToRateCount > 0 ? 1 : 0) + answers.Count;
+}
+
+<style>
+    .sh-next { display: flex; gap: 18px; align-items: center; }
+    .sh-date { flex: none; width: 82px; text-align: center; background: #0d1733; border: 1px solid #2a3a66; border-radius: 12px; padding: 10px 0; }
+    .sh-date .m { color: #9cc9ff; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .sh-date .d { font-size: 30px; font-weight: 700; line-height: 1.1; color: #fff; }
+    .sh-date .w { color: var(--text-muted); font-size: 12px; }
+    .sh-next h4 { margin: 0 0 4px; font-size: 18px; color: #fff; }
+    .sh-next p { margin: 0; color: var(--text-muted); }
+    .sh-todo { list-style: none; margin: 0; padding: 0; }
+    .sh-todo li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #22325a; }
+    .sh-todo li:first-child { border-top: 0; padding-top: 0; }
+    .sh-todo .t { color: var(--text-light); }
+    .sh-todo .t span { display: block; color: var(--text-muted); font-size: 12px; }
+    .sh-doc { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0; border-top: 1px solid #22325a; }
+    .sh-doc:first-of-type { border-top: 0; }
+    .sh-doc b { display: block; color: var(--text-light); font-weight: 600; }
+    .sh-doc span { color: var(--text-muted); font-size: 12px; }
+</style>
+
+<div class="st-head">
+    <div>
+        <h2>@StudentUi.Greeting(), @(string.IsNullOrEmpty(p.Name) ? Convert.ToString(Session["UserName"]) : p.Name)</h2>
+        <p>@(todo == 0 ? "You're all set. Here is an overview of your lessons." : "You have " + todo + " thing" + (todo == 1 ? "" : "s") + " to do. See the list below.")</p>
+    </div>
+    <div class="st-head-actions">
+        <a class="st-btn primary" href="@Url.Action("BookLesson", "Student")">+ Book a lesson</a>
+    </div>
+</div>
+
+<div class="st-stats">
+    <div class="st-stat"><div class="l">Upcoming lessons</div><div class="v">@upcoming.Count</div><div class="d">booked and not yet done</div></div>
+    <div class="st-stat"><div class="l">To pay</div><div class="v">@toPay.Count</div><div class="d">@Fmt.Rand(toPay.Sum(b => b.Price)) outstanding</div></div>
+    <div class="st-stat"><div class="l">Completed lessons</div><div class="v">@Model.CompletedCount</div><div class="d">since you joined</div></div>
+    <div class="st-stat"><div class="l">My licence</div><div class="v" style="font-size:20px;padding:4px 0 3px;">@(licence == "" ? "Not set" : licence == "None" ? "None yet" : licence == "Learner" ? "Learner's" : licence)</div><div class="d">@(licence == "" ? "add it on your profile" : licence == "None" ? "learner's licence lessons" : licence == "Code 14" ? "refresher lessons only" : "lessons for Code " + SnisDrivingSchool.Licence.TargetCode(licence, ""))</div></div>
+</div>
+
+<div class="st-grid-2">
+    <div class="st-card">
+        <h3>Next lesson</h3>
+        <p class="st-sub">Your first upcoming lesson.</p>
+        @if (next == null)
+        {
+            <div class="st-empty" style="padding:14px 0;text-align:left;">
+                You have no upcoming lessons.
+                <div class="st-actions" style="margin-top:12px;"><a class="st-btn primary" href="@Url.Action("BookLesson", "Student")">Book a lesson</a></div>
+            </div>
+        }
+        else
+        {
+            <div class="sh-next">
+                <div class="sh-date">
+                    <div class="m">@next.BookingDate.ToString("MMM")</div>
+                    <div class="d">@next.BookingDate.Day</div>
+                    <div class="w">@next.BookingDate.ToString("ddd")</div>
+                </div>
+                <div>
+                    <h4>@next.PackageName</h4>
+                    <p>@next.TimeText with @(string.IsNullOrEmpty(next.InstructorName) ? "an instructor" : next.InstructorName)</p>
+                    @if (next.LessonCount > 1)
+                    {
+                        <p>@next.LessonCount lessons: @next.DateRange</p>
+                    }
+                    <p style="margin-top:8px;">
+                        <span class="st-badge @StudentUi.StatusCss(next)">@next.DisplayStatus</span>
+                        <span class="st-badge @StudentUi.PayCss(next)">@StudentUi.PayText(next)</span>
+                    </p>
+                </div>
+            </div>
+            <div class="st-actions">
+                @if (!next.Paid && !next.AwaitingConfirmation)
+                {
+                    <a class="st-btn primary" href="@Url.Action("Payment", "Student", new { id = next.BookingId })">Pay now</a>
+                }
+                <a class="st-btn" href="@Url.Action("Bookings", "Student")">All my bookings</a>
+            </div>
+        }
+    </div>
+
+    <div class="st-card">
+        <h3>To do</h3>
+        <p class="st-sub">Things that need your attention.</p>
+        @if (todo == 0)
+        {
+            <div class="st-alert ok" style="margin:0;">Nothing to do. Your documents are on file and your bookings are paid.</div>
+        }
+        else
+        {
+            <ul class="sh-todo">
+                @if (needsId)
+                {
+                    <li><div class="t">Upload your ID document<span>A PDF copy of your ID is required.</span></div><a class="st-btn small" href="@Url.Action("Profile", "Student")">Upload</a></li>
+                }
+                @if (needsLicence)
+                {
+                    <li><div class="t">Upload your @(licence == "" || licence == "Learner" ? "learner's licence" : "licence")<span>Needed before you can book a lesson.</span></div><a class="st-btn small" href="@Url.Action("Profile", "Student")">Upload</a></li>
+                }
+                @if (Model.ToRateCount > 0)
+                {
+                    <li><div class="t">Rate your completed lesson@(Model.ToRateCount == 1 ? "" : "s")<span>@Model.ToRateCount lesson@(Model.ToRateCount == 1 ? " is" : "s are") waiting for your stars.</span></div><a class="st-btn small" href="@Url.Action("RateAndReviews", "Student")">Rate</a></li>
+                }
+                @foreach (var b in answers)
+                {
+                    <li><div class="t">Accept your new instructor<span>Booking #@b.BookingId on @b.BookingDate.ToString("ddd d MMM"): @b.ProposedInstructor is proposed.</span></div><a class="st-btn small primary" href="@Url.Action("Bookings", "Student")">Answer</a></li>
+                }
+                @foreach (var b in toPay.Take(4))
+                {
+                    <li><div class="t">Pay for booking #@b.BookingId<span>@b.PackageName · @b.BookingDate.ToString("ddd d MMM") · @Fmt.Rand(b.Price)</span></div><a class="st-btn small primary" href="@Url.Action("Payment", "Student", new { id = b.BookingId })">Pay</a></li>
+                }
+            </ul>
+        }
+    </div>
+</div>
+
+<div class="st-grid-2" style="margin-top:18px;">
+    <div class="st-card">
+        <div class="st-card-head">
+            <div><h3>Upcoming lessons</h3><p class="st-sub">The next few lessons you have booked.</p></div>
+            <a class="st-btn small" href="@Url.Action("Bookings", "Student")">View all</a>
+        </div>
+        @if (upcoming.Count == 0)
+        {
+            <div class="st-empty">No upcoming lessons.</div>
+        }
+        else
+        {
+            <div class="st-table-wrap">
+                <table class="st-table">
+                    <thead><tr><th>Date</th><th>Package</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var b in upcoming.Take(5))
+                        {
+                            <tr>
+                                <td class="nowrap">@b.BookingDate.ToString("ddd d MMM")<span class="st-small">@b.TimeText</span></td>
+                                <td>@b.PackageName</td>
+                                <td><span class="st-badge @StudentUi.StatusCss(b)">@b.DisplayStatus</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="st-card">
+        <div class="st-card-head">
+            <div><h3>My documents</h3><p class="st-sub">Copies the school keeps on file.</p></div>
+            <a class="st-btn small" href="@Url.Action("Profile", "Student")">Manage</a>
+        </div>
+        <div class="sh-doc">
+            <div><b>ID document</b><span>@(saId.IsValid ? "ID number " + p.IdNumber : "ID number not on file")</span></div>
+            @if (Model.IdDocumentId > 0)
+            {
+                <a class="st-btn small" target="_blank" href="@Url.Action("Open", "Documents", new { id = Model.IdDocumentId })">View PDF</a>
+            }
+            else
+            {
+                <span class="st-badge st-bad">Missing</span>
+            }
+        </div>
+        <div class="sh-doc">
+            <div><b>@SnisDrivingSchool.Licence.StatusText(p.LicenceStatus)</b><span>@(Model.LicenceDocumentId > 0 ? "Copy on file" : "No copy on file yet")</span></div>
+            @if (Model.LicenceDocumentId > 0)
+            {
+                <a class="st-btn small" target="_blank" href="@Url.Action("Open", "Documents", new { id = Model.LicenceDocumentId })">View PDF</a>
+            }
+            else if (licence == "None")
+            {
+                <span class="st-badge st-muted">Not needed</span>
+            }
+            else
+            {
+                <span class="st-badge st-bad">Missing</span>
+            }
+        </div>
+    </div>
+</div>

@@ -1,0 +1,193 @@
+﻿@{
+    string active = ViewBag.Active as string ?? "";
+}
+@* Reception pages: same look as the manager pages (home tiles, back button, dark tables and badges).
+   The styles below are the same as in Views/Manager/_ManagerNav.cshtml. *@
+<style>
+    .m-table-wrap {
+        overflow: auto;
+        max-height: 520px;
+        border: 1px solid #2a3557;
+        border-radius: 8px;
+    }
+
+    .m-table {
+        width: 100%;
+        border-collapse: collapse;
+        color: var(--text-light);
+        background: var(--navy-dark);
+        font-size: 14px;
+    }
+
+        .m-table th {
+            position: sticky;
+            top: 0;
+            background: #1b2a4e;
+            color: #fff;
+            text-align: left;
+            padding: 10px 12px;
+            white-space: nowrap;
+            border-bottom: 1px solid #2a3557;
+        }
+
+        .m-table td {
+            padding: 9px 12px;
+            border-bottom: 1px solid #1d2a4a;
+            white-space: nowrap;
+        }
+
+        .m-table tbody tr:hover td {
+            background: #16264a;
+        }
+
+    .m-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .m-ok {
+        background: #1b4a2b;
+        color: #9cffb0;
+    }
+
+    .m-warn {
+        background: #4a3a1b;
+        color: #ffd89c;
+    }
+
+    .m-bad {
+        background: #4a1b1b;
+        color: #ff9c9c;
+    }
+
+    .m-info {
+        background: #1b3a5a;
+        color: #9cc9ff;
+    }
+
+    .m-hint {
+        color: var(--text-muted);
+        font-size: 12px;
+        margin-top: 4px;
+        display: block;
+    }
+
+    .modal-content-custom select.form-control-custom {
+        height: 42px;
+    }
+
+    .m-due { background: #4a3a1b; color: #ffd89c; }
+
+    /* Back button shown on every manager page instead of the row of page buttons */
+    .m-backbar { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; }
+    .m-back {
+        display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px;
+        border: 2px solid var(--accent-blue-light); color: var(--accent-blue-light); font-weight: 600;
+        font-size: 14px; text-decoration: none; transition: .2s ease;
+    }
+    .m-back:hover { background: var(--accent-blue-light); color: var(--navy-dark); text-decoration: none; }
+    .m-crumb { color: var(--text-muted); font-size: 14px; }
+    .m-crumb span { margin: 0 4px; }
+    .m-crumb b { color: var(--text-light); }
+
+    /* Small action buttons inside tables */
+    .m-act {
+        background: transparent; border: 1px solid #2a3a66; color: var(--text-light);
+        border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; margin-right: 4px;
+    }
+    .m-act:hover { border-color: var(--accent-blue); }
+    .m-act.ok { border-color: #1b4a2b; color: #9cffb0; }
+    .m-act.bad { border-color: #4a1b1b; color: #ff9c9c; }
+    .m-inline { display: inline; }
+
+    /* Edit pop-ups (plain HTML dialog, no Bootstrap needed) */
+    dialog.m-dialog {
+        background: var(--navy-mid); color: var(--text-light); border: 1px solid #2a3557;
+        border-radius: 10px; padding: 0; width: 460px; max-width: calc(100vw - 32px);
+    }
+    dialog.m-dialog::backdrop { background: rgba(5, 10, 25, .7); }
+    .m-dialog-head { padding: 14px 20px; border-bottom: 1px solid #2a3557; display: flex; align-items: center; }
+    .m-dialog-head h4 { margin: 0; font-size: 18px; }
+    .m-dialog-head button { margin-left: auto; background: none; border: 0; color: var(--text-muted); font-size: 22px; cursor: pointer; }
+    .m-dialog-body { padding: 16px 20px; }
+    .m-dialog-foot { padding: 12px 20px; border-top: 1px solid #2a3557; text-align: right; }
+    .m-dialog-foot .btn-outline-accent { margin-right: 8px; }
+    .m-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .m-stat { background: var(--navy-mid); border: 1px solid #2a3557; border-radius: 8px; padding: 12px 14px; }
+    .m-stat .l { color: var(--text-muted); font-size: 12px; }
+    .m-stat .v { font-size: 24px; font-weight: 700; }
+    .m-section-title { margin: 22px 0 10px; font-size: 18px; }
+
+    /* the reception tables use the same look */
+    .elig { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .lv-tag { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #2c2350; color: #c9b8ff; white-space: nowrap; }
+</style>
+
+<div class="m-backbar">
+    <a class="m-back" href="@Url.Action("Index", "Receptionist")">&larr; Back to dashboard</a>
+    <span class="m-crumb">Reception <span>/</span> <b>@active</b></span>
+</div>
+
+<script>
+    window.addEventListener('load', function () {
+        // Live search on the table
+        var box = document.querySelector('[data-table-search]');
+        if (box) {
+            var table = document.getElementById(box.getAttribute('data-table-search'));
+            var counter = document.getElementById('rowCount');
+            box.addEventListener('input', function () {
+                var q = box.value.toLowerCase();
+                var shown = 0;
+                Array.prototype.forEach.call(table.querySelectorAll('tbody tr[data-row]'), function (tr) {
+                    var match = tr.textContent.toLowerCase().indexOf(q) > -1;
+                    tr.style.display = match ? '' : 'none';
+                    if (match) shown++;
+                });
+                if (counter) counter.textContent = shown;
+            });
+        }
+
+        // Works with both Bootstrap 3 (data-toggle) and Bootstrap 5 (data-bs-toggle)
+        Array.prototype.forEach.call(document.querySelectorAll('[data-toggle="modal"]'), function (el) {
+            el.setAttribute('data-bs-toggle', 'modal');
+            el.setAttribute('data-bs-target', el.getAttribute('data-target'));
+        });
+        Array.prototype.forEach.call(document.querySelectorAll('[data-dismiss="modal"]'), function (el) {
+            el.setAttribute('data-bs-dismiss', 'modal');
+        });
+
+        // Reopen the registration pop-up after an error so nothing is lost
+        var flag = document.getElementById('openModalFlag');
+        if (flag && flag.getAttribute('data-modal')) {
+            var modal = document.getElementById(flag.getAttribute('data-modal'));
+            if (modal && window.bootstrap && window.bootstrap.Modal) new window.bootstrap.Modal(modal).show();
+            else if (modal && window.jQuery && window.jQuery.fn.modal) window.jQuery(modal).modal('show');
+        }
+
+        // Edit buttons: <button data-dialog="editX" data-fields='{"id":1,"name":"..."}'> fills and opens <dialog id="editX">
+        Array.prototype.forEach.call(document.querySelectorAll('[data-dialog]'), function (btn) {
+            btn.addEventListener('click', function () {
+                var dlg = document.getElementById(btn.getAttribute('data-dialog'));
+                if (!dlg) return;
+                var fields = JSON.parse(btn.getAttribute('data-fields') || '{}');
+                var form = dlg.querySelector('form');
+                Object.keys(fields).forEach(function (k) {
+                    var input = form.elements[k];
+                    if (input) input.value = fields[k];
+                    var label = dlg.querySelector('[data-show="' + k + '"]');
+                    if (label) label.textContent = fields[k];
+                });
+                if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', 'open');
+            });
+        });
+        Array.prototype.forEach.call(document.querySelectorAll('[data-close-dialog]'), function (btn) {
+            btn.addEventListener('click', function () {
+                var dlg = btn.closest('dialog');
+                if (dlg.close) dlg.close(); else dlg.removeAttribute('open');
+            });
+        });
+    });
+</script>
